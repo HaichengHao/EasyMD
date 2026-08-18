@@ -171,8 +171,8 @@ function createWindow() {
     {
       label: t("\u7f16\u8f91"),
       submenu: [
-        { role: "undo", label: t("\u64a4\u9500") },
-        { role: "redo", label: t("\u91cd\u505a") },
+        { label: t("\u64a4\u9500"), accelerator: "CmdOrCtrl+Z", click: () => send("menu:undo") },
+        { label: t("\u91cd\u505a"), accelerator: "CmdOrCtrl+Shift+Z", click: () => send("menu:redo") },
         { type: "separator" },
         { role: "cut", label: t("\u526a\u5207") },
         { role: "copy", label: t("\u590d\u5236") },
@@ -214,17 +214,22 @@ function createWindow() {
     {
       label: t("\u4e3b\u9898"),
       submenu: [
-        ["Night", "night"],
-        ["Github", "github"],
-        ["Newsprint", "newsprint"],
-        ["Pixyll", "pixyll"],
-        ["Whitey", "whitey"],
-        ["MyPage Default", "mypage-default"],
-        ["Ink Graffiti", "ink-graffiti"]
-      ].map(([label, value]) => ({
-        label,
-        click: () => send("menu:theme", value)
-      }))
+        ...[
+          ["Night", "night"],
+          ["Github", "github"],
+          ["Newsprint", "newsprint"],
+          ["Pixyll", "pixyll"],
+          ["Whitey", "whitey"],
+          ["MyPage Default", "mypage-default"],
+          ["Ink Graffiti", "ink-graffiti"]
+        ].map(([label, value]) => ({
+          label,
+          click: () => send("menu:theme", value)
+        })),
+        { type: "separator" as const },
+        { label: t("\u5237\u65b0\u4e3b\u9898\u76ee\u5f55"), click: () => send("menu:refresh-themes") },
+        { label: t("\u5bfc\u5165\u4e3b\u9898..."), click: () => send("menu:import-theme") }
+      ]
     },
     {
       label: t("\u5e2e\u52a9"),

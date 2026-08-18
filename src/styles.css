@@ -159,8 +159,7 @@ button { color: inherit; border: 0; background: transparent; cursor: pointer; }
 .theme-ink-graffiti .markdown-body li {
   color: #ffd2b6;
 }
-.theme-ink-graffiti .tool-group button.active,
-.theme-ink-graffiti .theme-tools button:hover {
+.theme-ink-graffiti .tool-group button.active {
   color: #08070b;
   background: linear-gradient(135deg, #23d5ff, #ffcf33 52%, #ff2d75);
   box-shadow: 3px 3px 0 #08070b;
@@ -300,13 +299,6 @@ button { color: inherit; border: 0; background: transparent; cursor: pointer; }
   color: var(--muted);
 }
 .tool-group button:hover, .tool-group button.active { background: rgba(148, 163, 184, .18); color: var(--text); }
-.theme-tools {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding-left: 2px;
-  color: var(--muted);
-}
 .custom-select {
   position: relative;
   min-width: 0;
@@ -381,19 +373,6 @@ button { color: inherit; border: 0; background: transparent; cursor: pointer; }
   color: #ffffff;
   background: linear-gradient(90deg, rgba(96, 165, 250, .42), rgba(45, 212, 191, .22));
 }
-.theme-tools button {
-  width: 30px;
-  height: 30px;
-  display: grid;
-  place-items: center;
-  border-radius: 5px;
-  color: var(--muted);
-}
-.theme-tools button:hover {
-  color: var(--text);
-  background: rgba(148, 163, 184, .18);
-}
-
 .document-grid {
   min-height: 0;
   display: grid;

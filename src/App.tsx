@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { markdown as markdownLanguage } from "@codemirror/lang-markdown";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
+import { history, redo, undo } from "@codemirror/commands";
 import { Compartment, EditorState } from "@codemirror/state";
 import { EditorView, lineNumbers } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
@@ -20,11 +21,9 @@ import {
   Link,
   List,
   ListOrdered,
-  Palette,
   PanelLeftClose,
   PanelLeftOpen,
   Quote,
-  RefreshCcw,
   Save,
   Search,
   ScrollText,
@@ -32,7 +31,6 @@ import {
   Scissors,
   SplitSquareHorizontal,
   Trash2,
-  Upload,
   X
 } from "lucide-react";
 import { applyFormat, FormatCommand } from "./editorCommands";
@@ -41,7 +39,7 @@ import { demoMarkdown, getOutline, renderMarkdown } from "./markdown";
 type ViewMode = "source" | "preview" | "split";
 type BuiltInThemeName = "night" | "github" | "newsprint" | "pixyll" | "whitey" | "mypage-default" | "ink-graffiti";
 type ThemeName = BuiltInThemeName | "custom" | `user:${string}`;
-type ShortcutAction = "save" | "open" | "newFile" | "bold" | "italic" | "link" | "codeBlock" | "source" | "preview" | "split" | "toggleSidebar" | "settings" | "find" | "replace";
+type ShortcutAction = "save" | "open" | "newFile" | "undo" | "redo" | "bold" | "italic" | "link" | "codeBlock" | "source" | "preview" | "split" | "toggleSidebar" | "settings" | "find" | "replace";
 type Language = "zh-CN" | "en-US";
 
 interface ContextMenuState {
@@ -60,6 +58,8 @@ const zh = {
   noHeading: "\u6682\u65e0\u6807\u9898",
   open: "\u6253\u5f00",
   save: "\u4fdd\u5b58",
+  undo: "\u64a4\u9500",
+  redo: "\u91cd\u505a",
   source: "\u6e90\u7801",
   preview: "\u9884\u89c8",
   split: "\u6e90\u7801\u548c\u9884\u89c8",
@@ -128,6 +128,8 @@ const en: typeof zh = {
   noHeading: "No headings",
   open: "Open",
   save: "Save",
+  undo: "Undo",
+  redo: "Redo",
   source: "Source",
   preview: "Preview",
   split: "Source and Preview",
@@ -273,6 +275,8 @@ const defaultShortcuts: Record<ShortcutAction, string> = {
   save: "Ctrl+S",
   open: "Ctrl+O",
   newFile: "Ctrl+N",
+  undo: "Ctrl+Z",
+  redo: "Ctrl+Shift+Z",
   bold: "Ctrl+B",
   italic: "Ctrl+I",
   link: "Ctrl+K",
@@ -290,6 +294,8 @@ const shortcutLabelKeys: Record<ShortcutAction, keyof typeof zh> = {
   save: "save",
   open: "open",
   newFile: "blankDocument",
+  undo: "undo",
+  redo: "redo",
   bold: "bold",
   italic: "italic",
   link: "link",
@@ -389,11 +395,6 @@ export function App() {
   const html = useMemo(() => renderMarkdown(markdown, { codeLineNumbers, copyLabel: t.copy }), [markdown, codeLineNumbers, t.copy]);
   const outline = useMemo(() => getOutline(markdown), [markdown]);
   const words = useMemo(() => markdown.trim() ? markdown.trim().split(/\s+/).length : 0, [markdown]);
-  const themeOptions = useMemo<Array<SelectOption<ThemeName>>>(() => [
-    ...themes.map((item) => ({ value: item.value, label: item.label })),
-    ...userThemes.map((item) => ({ value: item.id as ThemeName, label: item.name, group: t.themesFolder })),
-    ...(theme === "custom" ? [{ value: "custom" as ThemeName, label: customThemeName || t.customTheme }] : [])
-  ], [customThemeName, theme, t.customTheme, t.themesFolder, userThemes]);
   const languageOptions = useMemo<Array<SelectOption<Language>>>(() => [
     { value: "zh-CN", label: t.chinese },
     { value: "en-US", label: t.english }
@@ -452,6 +453,16 @@ export function App() {
       editor.focus();
       editor.dispatch({ selection: { anchor: result.selectionStart, head: result.selectionEnd } });
     });
+  }
+
+  function runUndo() {
+    const editor = editorViewRef.current;
+    if (editor) undo(editor);
+  }
+
+  function runRedo() {
+    const editor = editorViewRef.current;
+    if (editor) redo(editor);
   }
 
   function revealMatch(index: number) {
@@ -664,6 +675,8 @@ export function App() {
     if (action === "save") void saveFile(false);
     if (action === "open") void openFile();
     if (action === "newFile") newFile();
+    if (action === "undo") runUndo();
+    if (action === "redo") runRedo();
     if (action === "bold") runFormat("bold");
     if (action === "italic") runFormat("italic");
     if (action === "link") runFormat("link");
@@ -786,6 +799,7 @@ export function App() {
         extensions: [
           markdownLanguage(),
           syntaxHighlighting(sourceHighlightStyle),
+          history(),
           lineNumberCompartment.of(sourceLineNumbers ? lineNumbers() : []),
           EditorView.lineWrapping,
           EditorView.domEventHandlers({
@@ -840,7 +854,11 @@ export function App() {
       window.easyMD.onMenu("menu:save-as", () => void saveFile(true)),
       window.easyMD.onMenu("menu:view", (mode) => setViewMode(mode as ViewMode)),
       window.easyMD.onMenu("menu:theme", (name) => setTheme(name as ThemeName)),
+      window.easyMD.onMenu("menu:refresh-themes", () => void refreshUserThemes()),
+      window.easyMD.onMenu("menu:import-theme", () => customThemeInputRef.current?.click()),
       window.easyMD.onMenu("menu:toggle-sidebar", () => setSidebarOpen((value) => !value)),
+      window.easyMD.onMenu("menu:undo", runUndo),
+      window.easyMD.onMenu("menu:redo", runRedo),
       window.easyMD.onMenu("menu:format", (command) => runFormat(command as FormatCommand)),
       window.easyMD.onMenu("menu:check-updates", () => void checkUpdates(true))
     ];
@@ -939,27 +957,16 @@ export function App() {
               <button className={findOpen ? "active" : ""} title={t.find} onClick={() => openFindPanel(false)}><Search size={16} /></button>
               <button className={settingsOpen ? "active" : ""} title={t.settings} onClick={() => setSettingsOpen(true)}><Settings size={16} /></button>
             </div>
-            <div className="theme-tools">
-              <Palette size={15} />
-              <CustomSelect
-                title={t.theme}
-                value={theme}
-                options={themeOptions}
-                onChange={chooseTheme}
-              />
-              <button title={t.refreshThemes} onClick={() => void refreshUserThemes()}><RefreshCcw size={16} /></button>
-              <button title={t.uploadTheme} onClick={() => customThemeInputRef.current?.click()}><Upload size={16} /></button>
-              <input
-                ref={customThemeInputRef}
-                type="file"
-                accept=".css,text/css"
-                hidden
-                onChange={(event) => {
-                  void importTheme(event.target.files?.[0]);
-                  event.currentTarget.value = "";
-                }}
-              />
-            </div>
+            <input
+              ref={customThemeInputRef}
+              type="file"
+              accept=".css,text/css"
+              hidden
+              onChange={(event) => {
+                void importTheme(event.target.files?.[0]);
+                event.currentTarget.value = "";
+              }}
+            />
           </div>
 
           <section className={`document-grid mode-${viewMode}`} style={documentStyle}>
