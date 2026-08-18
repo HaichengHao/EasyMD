@@ -5,6 +5,13 @@ import path from "node:path";
 let recentFiles: string[] = [];
 let documentDirty = false;
 
+interface UserTheme {
+  id: string;
+  name: string;
+  filePath: string;
+  cssText: string;
+}
+
 function t(value: string) {
   return value;
 }
@@ -15,6 +22,44 @@ function getRecentFiles() {
 
 function rememberFile(filePath: string) {
   recentFiles = [filePath, ...getRecentFiles().filter((item) => item !== filePath)].slice(0, 12);
+}
+
+function projectRoot() {
+  return path.join(__dirname, "..");
+}
+
+function themeIdFromFile(filePath: string) {
+  return `user:${path.basename(filePath, path.extname(filePath)).replace(/[^a-zA-Z0-9_-]/g, "-").toLowerCase()}`;
+}
+
+function themeNameFromCss(cssText: string, filePath: string) {
+  const match = cssText.match(/@theme-name\s+(.+?)\s*;?/i);
+  return (match?.[1] || path.basename(filePath, path.extname(filePath))).replace(/^["']|["']$/g, "").trim();
+}
+
+async function ensureThemesDir() {
+  const themesDir = path.join(projectRoot(), "themes");
+  await fs.mkdir(themesDir, { recursive: true });
+  return themesDir;
+}
+
+async function readUserThemes(): Promise<UserTheme[]> {
+  const themesDir = await ensureThemesDir();
+  const entries = await fs.readdir(themesDir, { withFileTypes: true });
+  const cssFiles = entries
+    .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith(".css"))
+    .map((entry) => path.join(themesDir, entry.name));
+
+  const themes = await Promise.all(cssFiles.map(async (filePath) => {
+    const cssText = await fs.readFile(filePath, "utf8");
+    return {
+      id: themeIdFromFile(filePath),
+      name: themeNameFromCss(cssText, filePath),
+      filePath,
+      cssText
+    };
+  }));
+  return themes.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 function createWindow() {
@@ -177,6 +222,7 @@ ipcMain.handle("file:save", async (_event, payload: { filePath?: string; content
 });
 
 ipcMain.handle("file:recent", () => getRecentFiles());
+ipcMain.handle("theme:list", () => readUserThemes());
 ipcMain.on("document:set-dirty", (_event, dirty: boolean) => {
   documentDirty = dirty;
 });

@@ -1,0 +1,95 @@
+/*
+  EasyMD Theme Template
+  EasyMD 自定义主题模板
+
+  Usage / 使用方式:
+  1. Copy this file into the project root "themes" folder.
+     将这个文件复制到项目根目录的 "themes" 文件夹中。
+  2. Rename it, for example: ocean-note.css.
+     重命名，例如 ocean-note.css。
+  3. Edit the variables below and restart EasyMD, or click the refresh button beside the theme selector.
+     修改下面的变量，然后重启 EasyMD，或点击主题选择器旁边的刷新按钮。
+  4. Select your theme from the theme dropdown.
+     在主题下拉框中选择你的主题。
+
+  Theme name / 主题名称:
+  EasyMD reads the optional @theme-name marker from comments.
+  EasyMD 会从注释里的 @theme-name 标记读取主题显示名。
+
+  @theme-name My Custom Theme
+*/
+
+.app.theme-user {
+  /*
+    Core colors / 核心颜色
+    These variables control most EasyMD surfaces.
+    这些变量会控制 EasyMD 大部分界面区域。
+  */
+  --title: #10151f;
+  --top: #131a26;
+  --sidebar: #17202d;
+  --sidebar-active: #202c3d;
+  --canvas: #101722;
+  --paper: #141d2a;
+  --text: #edf4ff;
+  --muted: #93a4b8;
+  --line: rgba(147, 164, 184, .22);
+  --brand: #67e8f9;
+}
+
+/*
+  Optional application background / 可选：应用背景
+  Keep text readable. Avoid very busy backgrounds in editor areas.
+  请确保文字可读，编辑区域尽量不要使用过于复杂的背景。
+*/
+.app.theme-user .workspace,
+.app.theme-user .tool-row,
+.app.theme-user .source-wrap,
+.app.theme-user .source-pane,
+.app.theme-user .preview-pane {
+  background:
+    radial-gradient(circle at 16% 8%, rgba(103, 232, 249, .12), transparent 28%),
+    linear-gradient(180deg, var(--paper), var(--canvas));
+}
+
+/*
+  Markdown preview typography / Markdown 预览排版
+*/
+.app.theme-user .markdown-body h1,
+.app.theme-user .markdown-body h2,
+.app.theme-user .markdown-body h3 {
+  color: var(--text);
+}
+
+.app.theme-user .markdown-body a {
+  color: var(--brand);
+}
+
+.app.theme-user .markdown-body blockquote {
+  border-left-color: var(--brand);
+  background: rgba(103, 232, 249, .08);
+  color: var(--text);
+}
+
+/*
+  Code block style / 代码块样式
+*/
+.app.theme-user .md-code-block {
+  background: #0f1623;
+  border-color: var(--line);
+}
+
+.app.theme-user .md-code-block figcaption span::after {
+  background: linear-gradient(90deg, var(--brand), #a78bfa 52%, #facc15);
+}
+
+/*
+  Scrollbar style / 滚动条样式
+*/
+.app.theme-user * {
+  scrollbar-color: var(--brand) rgba(15, 23, 42, .18);
+}
+
+.app.theme-user *::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--brand), #a78bfa) border-box;
+}

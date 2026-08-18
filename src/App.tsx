@@ -17,6 +17,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Quote,
+  RefreshCcw,
   Save,
   ScrollText,
   Scissors,
@@ -28,7 +29,8 @@ import { applyFormat, FormatCommand } from "./editorCommands";
 import { demoMarkdown, getOutline, renderMarkdown } from "./markdown";
 
 type ViewMode = "source" | "preview" | "split";
-type ThemeName = "night" | "github" | "newsprint" | "pixyll" | "whitey" | "mypage-default" | "ink-graffiti" | "custom";
+type BuiltInThemeName = "night" | "github" | "newsprint" | "pixyll" | "whitey" | "mypage-default" | "ink-graffiti";
+type ThemeName = BuiltInThemeName | "custom" | `user:${string}`;
 
 interface ContextMenuState {
   x: number;
@@ -72,10 +74,11 @@ const zh = {
   headings: "\u4e2a\u6807\u9898",
   theme: "\u4e3b\u9898",
   uploadTheme: "\u5bfc\u5165\u4e3b\u9898",
+  refreshThemes: "\u5237\u65b0\u4e3b\u9898\u76ee\u5f55",
   invalidTheme: "\u4e3b\u9898 CSS \u4e0d\u53ef\u7528\uff0c\u5df2\u5207\u56de Night\u3002"
 };
 
-const themes: Array<{ value: ThemeName; label: string }> = [
+const themes: Array<{ value: BuiltInThemeName; label: string }> = [
   { value: "night", label: "Night" },
   { value: "github", label: "Github" },
   { value: "newsprint", label: "Newsprint" },
@@ -121,6 +124,7 @@ export function App() {
   const [codeLineNumbers, setCodeLineNumbers] = useState(false);
   const [showScrollbars, setShowScrollbars] = useState(true);
   const [customThemeName, setCustomThemeName] = useState<string>();
+  const [userThemes, setUserThemes] = useState<EasyMDUserTheme[]>([]);
   const customThemeInputRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<HTMLTextAreaElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
@@ -131,6 +135,7 @@ export function App() {
   const outline = useMemo(() => getOutline(markdown), [markdown]);
   const words = useMemo(() => markdown.trim() ? markdown.trim().split(/\s+/).length : 0, [markdown]);
   const sourceLineCount = useMemo(() => Math.max(1, markdown.split("\n").length), [markdown]);
+  const themeClass = theme.startsWith("user:") ? "theme-user" : `theme-${theme}`;
 
   async function openFile() {
     const result = await window.easyMD.openFile();
@@ -230,6 +235,31 @@ export function App() {
     }
   }
 
+  function applyThemeStyle(id: string, cssText: string) {
+    const style = document.getElementById(id) || document.createElement("style");
+    style.id = id;
+    style.textContent = cssText;
+    document.head.appendChild(style);
+  }
+
+  async function refreshUserThemes(selectedTheme = theme) {
+    const discovered = await window.easyMD.listThemes();
+    const usable = discovered.filter((item) => validateThemeCss(item.cssText));
+    setUserThemes(usable);
+    const activeTheme = usable.find((item) => item.id === selectedTheme);
+    if (activeTheme) {
+      applyThemeStyle("directory-theme", activeTheme.cssText);
+      setTheme(activeTheme.id as ThemeName);
+      return;
+    }
+    if (String(selectedTheme).startsWith("user:")) {
+      document.getElementById("directory-theme")?.remove();
+      setTheme("night");
+      localStorage.setItem("easymd.theme", "night");
+      window.alert(zh.invalidTheme);
+    }
+  }
+
   async function importTheme(file?: File) {
     if (!file) return;
     const cssText = await file.text();
@@ -243,10 +273,8 @@ export function App() {
       window.alert(zh.invalidTheme);
       return;
     }
-    const style = document.getElementById("custom-theme") || document.createElement("style");
-    style.id = "custom-theme";
-    style.textContent = cssText;
-    document.head.appendChild(style);
+    document.getElementById("directory-theme")?.remove();
+    applyThemeStyle("custom-theme", cssText);
     const nextName = file.name.replace(/\.css$/i, "");
     setCustomThemeName(nextName);
     localStorage.setItem("easymd.customThemeCss", cssText);
@@ -255,14 +283,29 @@ export function App() {
     setTheme("custom");
   }
 
+  function chooseTheme(nextTheme: ThemeName) {
+    if (nextTheme.startsWith("user:")) {
+      const userTheme = userThemes.find((item) => item.id === nextTheme);
+      if (!userTheme || !validateThemeCss(userTheme.cssText)) {
+        document.getElementById("directory-theme")?.remove();
+        setTheme("night");
+        localStorage.setItem("easymd.theme", "night");
+        window.alert(zh.invalidTheme);
+        return;
+      }
+      document.getElementById("custom-theme")?.remove();
+      applyThemeStyle("directory-theme", userTheme.cssText);
+    } else {
+      document.getElementById("directory-theme")?.remove();
+    }
+    setTheme(nextTheme);
+  }
+
   useEffect(() => {
     const savedCustomCss = localStorage.getItem("easymd.customThemeCss");
     const savedCustomName = localStorage.getItem("easymd.customThemeName");
     if (savedCustomCss && validateThemeCss(savedCustomCss)) {
-      const style = document.getElementById("custom-theme") || document.createElement("style");
-      style.id = "custom-theme";
-      style.textContent = savedCustomCss;
-      document.head.appendChild(style);
+      applyThemeStyle("custom-theme", savedCustomCss);
       setCustomThemeName(savedCustomName || "Custom Theme");
     } else if (savedCustomCss) {
       document.getElementById("custom-theme")?.remove();
@@ -276,6 +319,7 @@ export function App() {
     if (savedTheme && (builtInTheme || (savedTheme === "custom" && savedCustomCss && validateThemeCss(savedCustomCss)))) {
       setTheme(savedTheme);
     }
+    void refreshUserThemes(savedTheme || "night");
   }, []);
 
   useEffect(() => {
@@ -326,7 +370,7 @@ export function App() {
   }, []);
 
   return (
-    <div className={`app theme-${theme} ${theme === "custom" ? "custom-theme" : ""} ${showScrollbars ? "" : "hide-scrollbars"}`} onContextMenu={showContextMenu}>
+    <div className={`app ${themeClass} ${theme === "custom" ? "custom-theme" : ""} ${showScrollbars ? "" : "hide-scrollbars"}`} onContextMenu={showContextMenu}>
       <div className="title-strip">
         <img src="./icon.svg" alt="EasyMD" />
         <span>EasyMD</span>
@@ -399,12 +443,16 @@ export function App() {
               <Palette size={15} />
               <select
                 title={zh.theme}
-                value={theme === "custom" ? "custom" : theme}
-                onChange={(event) => setTheme(event.target.value as ThemeName)}
+                value={theme}
+                onChange={(event) => chooseTheme(event.target.value as ThemeName)}
               >
                 {themes.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+                {userThemes.length > 0 && <optgroup label="Themes Folder">
+                  {userThemes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                </optgroup>}
                 {theme === "custom" && <option value="custom">{customThemeName || "Custom Theme"}</option>}
               </select>
+              <button title={zh.refreshThemes} onClick={() => void refreshUserThemes()}><RefreshCcw size={16} /></button>
               <button title={zh.uploadTheme} onClick={() => customThemeInputRef.current?.click()}><Upload size={16} /></button>
               <input
                 ref={customThemeInputRef}
