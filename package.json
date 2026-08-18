@@ -1,6 +1,6 @@
 {
   "name": "easymd",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A lightweight cross-platform Markdown desktop editor.",
   "author": "EasyMD Contributors",
   "main": "dist-electron/main.cjs",
@@ -58,8 +58,6 @@
       "icon": "assets/icon.png",
       "category": "Office",
       "maintainer": "EasyMD Contributors",
-      "desktopName": "EasyMD",
-      "syncDesktopName": true,
       "executableName": "easymd",
       "artifactName": "easymd.${ext}"
     }
