@@ -2,6 +2,7 @@
   "name": "easymd",
   "version": "0.1.0",
   "description": "A lightweight cross-platform Markdown desktop editor.",
+  "author": "EasyMD Contributors",
   "main": "dist-electron/main.cjs",
   "type": "module",
   "scripts": {
@@ -9,13 +10,16 @@
     "build": "tsc && vite build && npm run build:electron",
     "build:electron": "tsup electron/main.ts electron/preload.ts --format cjs --out-dir dist-electron --clean --external electron",
     "dist": "npm run build && electron-builder",
-    "dist:win": "npm run build && electron-builder --win portable nsis",
+    "dist:win": "npm run build && electron-builder --win nsis portable",
+    "dist:linux": "npm run build && electron-builder --linux AppImage deb rpm",
+    "dist:all": "npm run build && electron-builder --win nsis portable --linux AppImage deb rpm",
     "preview": "vite preview --host 127.0.0.1",
     "start": "electron ."
   },
   "build": {
     "appId": "dev.easymd.editor",
     "productName": "EasyMD",
+    "icon": "assets/icon.png",
     "directories": {
       "output": "release"
     },
@@ -23,13 +27,21 @@
       "dist/**/*",
       "dist-electron/**/*",
       "assets/**/*",
+      "example_theme/**/*",
+      "themes/**/*",
       "package.json"
     ],
+    "artifactName": "${productName}_${version}_${os}_${arch}.${ext}",
     "win": {
       "target": [
-        "portable",
-        "nsis"
-      ]
+        "nsis",
+        "portable"
+      ],
+      "icon": "assets/icon.png",
+      "artifactName": "${productName}_installer.${ext}"
+    },
+    "portable": {
+      "artifactName": "${productName}_portable.${ext}"
     },
     "nsis": {
       "oneClick": false,
@@ -37,6 +49,17 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "EasyMD"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb",
+        "rpm"
+      ],
+      "icon": "assets/icon.png",
+      "category": "Office",
+      "maintainer": "EasyMD Contributors",
+      "executableName": "easymd"
     }
   },
   "dependencies": {

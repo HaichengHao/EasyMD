@@ -72,7 +72,15 @@ Windows packaging is configured with electron-builder:
 npm run dist:win
 ```
 
-The generated installer or portable app will be written to `release/`.
+This creates `release/EasyMD_installer.exe` and `release/EasyMD_portable.exe`.
+
+Linux packaging is configured for AppImage, deb, and rpm:
+
+```bash
+npm run dist:linux
+```
+
+Linux artifacts are written to `release/`. Build Linux packages on Linux or in CI for the most reliable result.
 
 ## Project Layout
 

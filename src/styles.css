@@ -615,23 +615,28 @@ button { color: inherit; border: 0; background: transparent; cursor: pointer; }
 }
 
 .md-code-block {
-  margin: 12px 0;
+  width: fit-content;
+  max-width: 100%;
+  min-width: min(360px, 100%);
+  margin: 10px 0;
   border: 1px solid rgba(148, 163, 184, .22);
-  border-radius: 8px;
+  border-radius: 6px;
   overflow: hidden;
   background: #1f242c;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04);
+  box-shadow: none;
 }
 .md-code-block figcaption {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin: 0;
-  min-height: 26px;
-  padding: 4px 10px;
+  min-height: 0;
+  height: 24px;
+  padding: 0 8px;
   border-bottom: 1px solid rgba(148, 163, 184, .18);
   color: #aab6ca;
-  font-size: 12px;
+  font-size: 11px;
+  line-height: 1;
   font-family: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
   text-transform: uppercase;
 }
@@ -647,29 +652,30 @@ button { color: inherit; border: 0; background: transparent; cursor: pointer; }
   vertical-align: middle;
 }
 .md-code-block figcaption button {
-  padding: 2px 8px;
+  padding: 1px 7px;
   border: 1px solid rgba(148, 163, 184, .2);
-  border-radius: 5px;
+  border-radius: 4px;
   color: #d7dfec;
   background: rgba(148, 163, 184, .1);
-  font-size: 11px;
+  font-size: 10px;
+  line-height: 17px;
   text-transform: none;
 }
-.md-code-block pre { margin: 0; padding: 6px 12px; overflow: auto; }
+.md-code-block pre { margin: 0; padding: 5px 10px; overflow: auto; }
 .md-code-block code {
   display: block;
   counter-reset: code-line;
   color: #d7dfec;
   background: transparent;
   font-size: 12.5px;
-  line-height: 1.36;
+  line-height: 1.32;
   font-family: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
 }
 .md-code-block code .code-line {
   display: grid;
   grid-template-columns: 32px minmax(0, 1fr);
   counter-increment: code-line;
-  min-height: 17px;
+  min-height: 16px;
 }
 .code-line-number::before {
   content: counter(code-line);
