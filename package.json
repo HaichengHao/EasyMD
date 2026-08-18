@@ -1,6 +1,6 @@
 {
   "name": "easymd",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A lightweight cross-platform Markdown desktop editor.",
   "author": "EasyMD Contributors",
   "main": "dist-electron/main.cjs",
