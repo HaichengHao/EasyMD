@@ -555,6 +555,15 @@ button { color: inherit; border: 0; background: transparent; cursor: pointer; }
 .settings-section input[type="range"] {
   width: 100%;
 }
+.settings-section select {
+  height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  color: var(--text);
+  background: rgba(15, 23, 42, .18);
+  padding: 0 8px;
+  outline: none;
+}
 
 .markdown-body {
   color: var(--text);
@@ -606,7 +615,7 @@ button { color: inherit; border: 0; background: transparent; cursor: pointer; }
 }
 
 .md-code-block {
-  margin: 14px 0;
+  margin: 12px 0;
   border: 1px solid rgba(148, 163, 184, .22);
   border-radius: 8px;
   overflow: hidden;
@@ -618,7 +627,8 @@ button { color: inherit; border: 0; background: transparent; cursor: pointer; }
   justify-content: space-between;
   align-items: center;
   margin: 0;
-  padding: 6px 12px;
+  min-height: 26px;
+  padding: 4px 10px;
   border-bottom: 1px solid rgba(148, 163, 184, .18);
   color: #aab6ca;
   font-size: 12px;
@@ -628,9 +638,9 @@ button { color: inherit; border: 0; background: transparent; cursor: pointer; }
 .md-code-block figcaption span::after {
   content: "";
   display: inline-block;
-  width: 72px;
-  height: 3px;
-  margin-left: 14px;
+  width: 56px;
+  height: 2px;
+  margin-left: 10px;
   border-radius: 999px;
   background: var(--brand);
   opacity: .85;
@@ -645,21 +655,21 @@ button { color: inherit; border: 0; background: transparent; cursor: pointer; }
   font-size: 11px;
   text-transform: none;
 }
-.md-code-block pre { margin: 0; padding: 8px 14px; overflow: auto; }
+.md-code-block pre { margin: 0; padding: 6px 12px; overflow: auto; }
 .md-code-block code {
   display: block;
   counter-reset: code-line;
   color: #d7dfec;
   background: transparent;
-  font-size: 13px;
-  line-height: 1.42;
+  font-size: 12.5px;
+  line-height: 1.36;
   font-family: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
 }
 .md-code-block code .code-line {
   display: grid;
   grid-template-columns: 32px minmax(0, 1fr);
   counter-increment: code-line;
-  min-height: 18px;
+  min-height: 17px;
 }
 .code-line-number::before {
   content: counter(code-line);

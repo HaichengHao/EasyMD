@@ -14,6 +14,7 @@ export interface OutlineItem {
 
 export interface RenderOptions {
   codeLineNumbers?: boolean;
+  copyLabel?: string;
 }
 
 function slugify(value: string) {
@@ -110,6 +111,8 @@ function addCodeLineNumbers(html: string) {
   container.innerHTML = html;
   container.querySelectorAll(".md-code-block code").forEach((code) => {
     const lines = code.innerHTML.replace(/\n$/, "").split("\n");
+    while (lines.length > 1 && !lines[0].trim()) lines.shift();
+    while (lines.length > 1 && !lines[lines.length - 1].trim()) lines.pop();
     code.innerHTML = lines
       .map((line) => `<span class="code-line"><span class="code-line-number"></span><span class="code-line-content">${line || " "}</span></span>`)
       .join("");
@@ -118,7 +121,8 @@ function addCodeLineNumbers(html: string) {
 }
 
 export function renderMarkdown(source: string, options: RenderOptions = {}) {
-  const html = md.render(source || "");
+  const copyLabel = options.copyLabel || "Copy";
+  const html = md.render(source || "").replaceAll("data-copy-code>Copy</button>", `data-copy-code>${escapeHtml(copyLabel)}</button>`);
   return options.codeLineNumbers ? addCodeLineNumbers(html) : html;
 }
 

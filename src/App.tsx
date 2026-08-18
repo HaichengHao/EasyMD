@@ -39,6 +39,7 @@ type ViewMode = "source" | "preview" | "split";
 type BuiltInThemeName = "night" | "github" | "newsprint" | "pixyll" | "whitey" | "mypage-default" | "ink-graffiti";
 type ThemeName = BuiltInThemeName | "custom" | `user:${string}`;
 type ShortcutAction = "save" | "open" | "newFile" | "bold" | "italic" | "link" | "codeBlock" | "source" | "preview" | "split" | "toggleSidebar" | "settings";
+type Language = "zh-CN" | "en-US";
 
 interface ContextMenuState {
   x: number;
@@ -83,12 +84,76 @@ const zh = {
   theme: "\u4e3b\u9898",
   uploadTheme: "\u5bfc\u5165\u4e3b\u9898",
   refreshThemes: "\u5237\u65b0\u4e3b\u9898\u76ee\u5f55",
+  themesFolder: "\u4e3b\u9898\u6587\u4ef6\u5939",
+  customTheme: "\u81ea\u5b9a\u4e49\u4e3b\u9898",
   settings: "\u8bbe\u7f6e",
   shortcuts: "\u5feb\u6377\u952e",
+  language: "\u8bed\u8a00",
+  chinese: "\u7b80\u4f53\u4e2d\u6587",
+  english: "English",
+  showScrollbars: "\u663e\u793a\u6eda\u52a8\u6761",
+  sourceLineNumbers: "\u6e90\u7801\u884c\u53f7",
+  codeLineNumbers: "\u4ee3\u7801\u5757\u884c\u53f7",
   resetShortcuts: "\u6062\u590d\u9ed8\u8ba4",
   close: "\u5173\u95ed",
   zoom: "\u7f29\u653e",
+  copied: "\u5df2\u590d\u5236",
   invalidTheme: "\u4e3b\u9898 CSS \u4e0d\u53ef\u7528\uff0c\u5df2\u5207\u56de Night\u3002"
+};
+
+const en: typeof zh = {
+  saved: "Saved",
+  unsaved: "Unsaved",
+  file: "Files",
+  outline: "Outline",
+  currentDocument: "Current Document",
+  blankDocument: "Blank Document",
+  recentFile: "Recent File",
+  noHeading: "No headings",
+  open: "Open",
+  save: "Save",
+  source: "Source",
+  preview: "Preview",
+  split: "Source and Preview",
+  hideSidebar: "Hide Sidebar",
+  showSidebar: "Show Sidebar",
+  bold: "Bold",
+  italic: "Italic",
+  heading: "Heading",
+  quote: "Quote",
+  list: "List",
+  codeBlock: "Code Block",
+  link: "Link",
+  cut: "Cut",
+  copy: "Copy",
+  paste: "Paste",
+  delete: "Delete",
+  orderedList: "Ordered List",
+  unorderedList: "Unordered List",
+  taskList: "Task List",
+  h1: "Heading 1",
+  h2: "Heading 2",
+  formulaBlock: "Formula Block",
+  words: "words",
+  headings: "headings",
+  theme: "Theme",
+  uploadTheme: "Import Theme",
+  refreshThemes: "Refresh Theme Folder",
+  themesFolder: "Themes Folder",
+  customTheme: "Custom Theme",
+  settings: "Settings",
+  shortcuts: "Shortcuts",
+  language: "Language",
+  chinese: "Simplified Chinese",
+  english: "English",
+  showScrollbars: "Show Scrollbars",
+  sourceLineNumbers: "Source Line Numbers",
+  codeLineNumbers: "Code Block Line Numbers",
+  resetShortcuts: "Reset Defaults",
+  close: "Close",
+  zoom: "Zoom",
+  copied: "Copied",
+  invalidTheme: "Theme CSS is invalid. EasyMD has switched back to Night."
 };
 
 const themes: Array<{ value: BuiltInThemeName; label: string }> = [
@@ -101,14 +166,14 @@ const themes: Array<{ value: BuiltInThemeName; label: string }> = [
   { value: "ink-graffiti", label: "Ink Graffiti" }
 ];
 
-const toolbar: Array<{ command: FormatCommand; label: string; icon: JSX.Element }> = [
-  { command: "bold", label: zh.bold, icon: <Bold size={16} /> },
-  { command: "italic", label: zh.italic, icon: <Italic size={16} /> },
-  { command: "h2", label: zh.heading, icon: <AlignLeft size={16} /> },
-  { command: "quote", label: zh.quote, icon: <Quote size={16} /> },
-  { command: "list", label: zh.list, icon: <List size={16} /> },
-  { command: "code", label: zh.codeBlock, icon: <Code2 size={16} /> },
-  { command: "link", label: zh.link, icon: <Link size={16} /> }
+const toolbar: Array<{ command: FormatCommand; labelKey: keyof typeof zh; icon: JSX.Element }> = [
+  { command: "bold", labelKey: "bold", icon: <Bold size={16} /> },
+  { command: "italic", labelKey: "italic", icon: <Italic size={16} /> },
+  { command: "h2", labelKey: "heading", icon: <AlignLeft size={16} /> },
+  { command: "quote", labelKey: "quote", icon: <Quote size={16} /> },
+  { command: "list", labelKey: "list", icon: <List size={16} /> },
+  { command: "code", labelKey: "codeBlock", icon: <Code2 size={16} /> },
+  { command: "link", labelKey: "link", icon: <Link size={16} /> }
 ];
 
 const defaultShortcuts: Record<ShortcutAction, string> = {
@@ -126,19 +191,19 @@ const defaultShortcuts: Record<ShortcutAction, string> = {
   settings: "Ctrl+,"
 };
 
-const shortcutLabels: Record<ShortcutAction, string> = {
-  save: "Save",
-  open: "Open",
-  newFile: "New File",
-  bold: "Bold",
-  italic: "Italic",
-  link: "Link",
-  codeBlock: "Code Block",
-  source: "Source View",
-  preview: "Preview View",
-  split: "Split View",
-  toggleSidebar: "Toggle Sidebar",
-  settings: "Settings"
+const shortcutLabelKeys: Record<ShortcutAction, keyof typeof zh> = {
+  save: "save",
+  open: "open",
+  newFile: "blankDocument",
+  bold: "bold",
+  italic: "italic",
+  link: "link",
+  codeBlock: "codeBlock",
+  source: "source",
+  preview: "preview",
+  split: "split",
+  toggleSidebar: "hideSidebar",
+  settings: "settings"
 };
 
 const sourceHighlightStyle = HighlightStyle.define([
@@ -202,6 +267,7 @@ export function App() {
   const [codeLineNumbers, setCodeLineNumbers] = useState(true);
   const [showScrollbars, setShowScrollbars] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [language, setLanguageState] = useState<Language>(() => (localStorage.getItem("easymd.language") as Language) || "zh-CN");
   const [shortcuts, setShortcuts] = useState<Record<ShortcutAction, string>>(() => loadShortcuts());
   const [zoom, setZoom] = useState(() => Number(localStorage.getItem("easymd.zoom") || 100));
   const [splitRatio, setSplitRatio] = useState(() => Number(localStorage.getItem("easymd.splitRatio") || 50));
@@ -215,7 +281,8 @@ export function App() {
   const previewRef = useRef<HTMLDivElement>(null);
   const syncing = useRef(false);
 
-  const html = useMemo(() => renderMarkdown(markdown, { codeLineNumbers }), [markdown, codeLineNumbers]);
+  const t = language === "zh-CN" ? zh : en;
+  const html = useMemo(() => renderMarkdown(markdown, { codeLineNumbers, copyLabel: t.copy }), [markdown, codeLineNumbers, t.copy]);
   const outline = useMemo(() => getOutline(markdown), [markdown]);
   const words = useMemo(() => markdown.trim() ? markdown.trim().split(/\s+/).length : 0, [markdown]);
   const themeClass = theme.startsWith("user:") ? "theme-user" : `theme-${theme}`;
@@ -353,7 +420,7 @@ export function App() {
       document.getElementById("directory-theme")?.remove();
       setTheme("night");
       localStorage.setItem("easymd.theme", "night");
-      window.alert(zh.invalidTheme);
+      window.alert(t.invalidTheme);
     }
   }
 
@@ -367,7 +434,7 @@ export function App() {
       localStorage.removeItem("easymd.customThemeCss");
       localStorage.removeItem("easymd.customThemeName");
       localStorage.setItem("easymd.theme", "night");
-      window.alert(zh.invalidTheme);
+      window.alert(t.invalidTheme);
       return;
     }
     document.getElementById("directory-theme")?.remove();
@@ -387,7 +454,7 @@ export function App() {
         document.getElementById("directory-theme")?.remove();
         setTheme("night");
         localStorage.setItem("easymd.theme", "night");
-        window.alert(zh.invalidTheme);
+        window.alert(t.invalidTheme);
         return;
       }
       document.getElementById("custom-theme")?.remove();
@@ -415,6 +482,11 @@ export function App() {
     localStorage.setItem("easymd.zoom", String(normalized));
   }
 
+  function setLanguage(nextLanguage: Language) {
+    setLanguageState(nextLanguage);
+    localStorage.setItem("easymd.language", nextLanguage);
+  }
+
   function runShortcutAction(action: ShortcutAction) {
     if (action === "save") void saveFile(false);
     if (action === "open") void openFile();
@@ -435,7 +507,7 @@ export function App() {
     const savedCustomName = localStorage.getItem("easymd.customThemeName");
     if (savedCustomCss && validateThemeCss(savedCustomCss)) {
       applyThemeStyle("custom-theme", savedCustomCss);
-      setCustomThemeName(savedCustomName || "Custom Theme");
+      setCustomThemeName(savedCustomName || t.customTheme);
     } else if (savedCustomCss) {
       document.getElementById("custom-theme")?.remove();
       localStorage.removeItem("easymd.customThemeCss");
@@ -580,9 +652,9 @@ export function App() {
       if (!button) return;
       const code = button.closest(".md-code-block")?.querySelector("code")?.textContent || "";
       void navigator.clipboard.writeText(code);
-      button.textContent = "Copied";
+      button.textContent = t.copied;
       window.setTimeout(() => {
-        button.textContent = "Copy";
+        button.textContent = t.copy;
       }, 1200);
     };
     document.addEventListener("click", hide);
@@ -593,31 +665,31 @@ export function App() {
       document.removeEventListener("click", onCopy);
       window.removeEventListener("blur", hide);
     };
-  }, []);
+  }, [t.copy, t.copied]);
 
   return (
     <div className={`app ${themeClass} ${theme === "custom" ? "custom-theme" : ""} ${showScrollbars ? "" : "hide-scrollbars"}`} onContextMenu={showContextMenu}>
       <div className="workspace">
         <aside className={sidebarOpen ? "sidebar" : "sidebar collapsed"}>
-          <button className="sidebar-toggle" onClick={() => setSidebarOpen((value) => !value)} title={sidebarOpen ? zh.hideSidebar : zh.showSidebar}>
+          <button className="sidebar-toggle" onClick={() => setSidebarOpen((value) => !value)} title={sidebarOpen ? t.hideSidebar : t.showSidebar}>
             {sidebarOpen ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
           </button>
           {sidebarOpen && (
             <>
               <div className="sidebar-tabs">
-                <button className={sidebarTab === "files" ? "active" : ""} onClick={() => setSidebarTab("files")}>{zh.file}</button>
-                <button className={sidebarTab === "outline" ? "active" : ""} onClick={() => setSidebarTab("outline")}>{zh.outline}</button>
+                <button className={sidebarTab === "files" ? "active" : ""} onClick={() => setSidebarTab("files")}>{t.file}</button>
+                <button className={sidebarTab === "outline" ? "active" : ""} onClick={() => setSidebarTab("outline")}>{t.outline}</button>
               </div>
               {sidebarTab === "files" ? (
                 <div className="file-list">
                   <button className="file-card active">
-                    <small>{zh.currentDocument}</small>
+                    <small>{t.currentDocument}</small>
                     <strong>{fileName(filePath)}</strong>
-                    <span>{markdown.split("\n")[0]?.replace(/^#\s*/, "") || zh.blankDocument}</span>
+                    <span>{markdown.split("\n")[0]?.replace(/^#\s*/, "") || t.blankDocument}</span>
                   </button>
                   {recentFiles.map((item) => (
                     <button className="file-card" key={item}>
-                      <small>{zh.recentFile}</small>
+                      <small>{t.recentFile}</small>
                       <strong>{fileName(item)}</strong>
                       <span>{item}</span>
                     </button>
@@ -633,7 +705,7 @@ export function App() {
                     >
                       {item.text}
                     </button>
-                  )) : <p>{zh.noHeading}</p>}
+                  )) : <p>{t.noHeading}</p>}
                 </nav>
               )}
             </>
@@ -643,38 +715,38 @@ export function App() {
         <main className="editor-shell">
           <div className="tool-row">
             <div className="tool-group">
-              <button title={zh.open} onClick={openFile}><FileText size={16} /></button>
-              <button title={zh.save} onClick={() => void saveFile(false)}><Save size={16} /></button>
+              <button title={t.open} onClick={openFile}><FileText size={16} /></button>
+              <button title={t.save} onClick={() => void saveFile(false)}><Save size={16} /></button>
             </div>
             <div className="tool-group">
               {toolbar.map((item) => (
-                <button title={item.label} key={item.command} onClick={() => runFormat(item.command)}>{item.icon}</button>
+                <button title={t[item.labelKey]} key={item.command} onClick={() => runFormat(item.command)}>{item.icon}</button>
               ))}
             </div>
             <div className="tool-group mode-group">
-              <button className={showScrollbars ? "active" : ""} title="Show scrollbars" onClick={() => setShowScrollbars((value) => !value)}><ScrollText size={16} /></button>
-              <button className={sourceLineNumbers ? "active" : ""} title="Source line numbers" onClick={() => setSourceLineNumbers((value) => !value)}><ListOrdered size={16} /></button>
-              <button className={codeLineNumbers ? "active" : ""} title="Code block line numbers" onClick={() => setCodeLineNumbers((value) => !value)}><Code2 size={16} /></button>
-              <button className={viewMode === "source" ? "active" : ""} title={zh.source} onClick={() => setViewMode("source")}><FileCode2 size={16} /></button>
-              <button className={viewMode === "preview" ? "active" : ""} title={zh.preview} onClick={() => setViewMode("preview")}><Eye size={16} /></button>
-              <button className={viewMode === "split" ? "active" : ""} title={zh.split} onClick={() => setViewMode("split")}><SplitSquareHorizontal size={16} /></button>
-              <button className={settingsOpen ? "active" : ""} title={zh.settings} onClick={() => setSettingsOpen(true)}><Settings size={16} /></button>
+              <button className={showScrollbars ? "active" : ""} title={t.showScrollbars} onClick={() => setShowScrollbars((value) => !value)}><ScrollText size={16} /></button>
+              <button className={sourceLineNumbers ? "active" : ""} title={t.sourceLineNumbers} onClick={() => setSourceLineNumbers((value) => !value)}><ListOrdered size={16} /></button>
+              <button className={codeLineNumbers ? "active" : ""} title={t.codeLineNumbers} onClick={() => setCodeLineNumbers((value) => !value)}><Code2 size={16} /></button>
+              <button className={viewMode === "source" ? "active" : ""} title={t.source} onClick={() => setViewMode("source")}><FileCode2 size={16} /></button>
+              <button className={viewMode === "preview" ? "active" : ""} title={t.preview} onClick={() => setViewMode("preview")}><Eye size={16} /></button>
+              <button className={viewMode === "split" ? "active" : ""} title={t.split} onClick={() => setViewMode("split")}><SplitSquareHorizontal size={16} /></button>
+              <button className={settingsOpen ? "active" : ""} title={t.settings} onClick={() => setSettingsOpen(true)}><Settings size={16} /></button>
             </div>
             <div className="theme-tools">
               <Palette size={15} />
               <select
-                title={zh.theme}
+                title={t.theme}
                 value={theme}
                 onChange={(event) => chooseTheme(event.target.value as ThemeName)}
               >
                 {themes.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
-                {userThemes.length > 0 && <optgroup label="Themes Folder">
+                {userThemes.length > 0 && <optgroup label={t.themesFolder}>
                   {userThemes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                 </optgroup>}
-                {theme === "custom" && <option value="custom">{customThemeName || "Custom Theme"}</option>}
+                {theme === "custom" && <option value="custom">{customThemeName || t.customTheme}</option>}
               </select>
-              <button title={zh.refreshThemes} onClick={() => void refreshUserThemes()}><RefreshCcw size={16} /></button>
-              <button title={zh.uploadTheme} onClick={() => customThemeInputRef.current?.click()}><Upload size={16} /></button>
+              <button title={t.refreshThemes} onClick={() => void refreshUserThemes()}><RefreshCcw size={16} /></button>
+              <button title={t.uploadTheme} onClick={() => customThemeInputRef.current?.click()}><Upload size={16} /></button>
               <input
                 ref={customThemeInputRef}
                 type="file"
@@ -717,26 +789,26 @@ export function App() {
       {contextMenu && (
         <div className="context-menu" style={{ left: contextMenu.x, top: contextMenu.y }} onClick={(event) => event.stopPropagation()}>
           <div className="context-icons">
-            <button title={zh.cut} onClick={() => void nativeEdit("cut")}><Scissors size={16} /></button>
-            <button title={zh.copy} onClick={() => void nativeEdit("copy")}><Copy size={16} /></button>
-            <button title={zh.paste} onClick={() => void nativeEdit("paste")}><Clipboard size={16} /></button>
-            <button title={zh.delete} onClick={() => void nativeEdit("delete")}><Trash2 size={16} /></button>
+            <button title={t.cut} onClick={() => void nativeEdit("cut")}><Scissors size={16} /></button>
+            <button title={t.copy} onClick={() => void nativeEdit("copy")}><Copy size={16} /></button>
+            <button title={t.paste} onClick={() => void nativeEdit("paste")}><Clipboard size={16} /></button>
+            <button title={t.delete} onClick={() => void nativeEdit("delete")}><Trash2 size={16} /></button>
           </div>
-          <button className="context-row" onClick={() => void nativeEdit("copy")}>{zh.copy}</button>
-          <button className="context-row" onClick={() => void nativeEdit("paste")}>{zh.paste}</button>
+          <button className="context-row" onClick={() => void nativeEdit("copy")}>{t.copy}</button>
+          <button className="context-row" onClick={() => void nativeEdit("paste")}>{t.paste}</button>
           <div className="context-grid">
-            <button title={zh.bold} onClick={() => runFormat("bold")}><Bold size={16} /></button>
-            <button title={zh.italic} onClick={() => runFormat("italic")}><Italic size={16} /></button>
-            <button title={zh.codeBlock} onClick={() => runFormat("code")}><Code2 size={16} /></button>
-            <button title={zh.link} onClick={() => runFormat("link")}><Link size={16} /></button>
-            <button title={zh.quote} onClick={() => runFormat("quote")}><Quote size={16} /></button>
-            <button title={zh.orderedList} onClick={() => insertRaw("\n1. item\n")}><ListOrdered size={16} /></button>
-            <button title={zh.unorderedList} onClick={() => runFormat("list")}><List size={16} /></button>
-            <button title={zh.taskList} onClick={() => insertRaw("\n- [ ] task\n")}><CheckSquare size={16} /></button>
+            <button title={t.bold} onClick={() => runFormat("bold")}><Bold size={16} /></button>
+            <button title={t.italic} onClick={() => runFormat("italic")}><Italic size={16} /></button>
+            <button title={t.codeBlock} onClick={() => runFormat("code")}><Code2 size={16} /></button>
+            <button title={t.link} onClick={() => runFormat("link")}><Link size={16} /></button>
+            <button title={t.quote} onClick={() => runFormat("quote")}><Quote size={16} /></button>
+            <button title={t.orderedList} onClick={() => insertRaw("\n1. item\n")}><ListOrdered size={16} /></button>
+            <button title={t.unorderedList} onClick={() => runFormat("list")}><List size={16} /></button>
+            <button title={t.taskList} onClick={() => insertRaw("\n- [ ] task\n")}><CheckSquare size={16} /></button>
           </div>
-          <button className="context-row" onClick={() => runFormat("h1")}>{zh.h1}</button>
-          <button className="context-row" onClick={() => runFormat("h2")}>{zh.h2}</button>
-          <button className="context-row" onClick={() => insertRaw("\n$$\nE = mc^2\n$$\n")}>{zh.formulaBlock}</button>
+          <button className="context-row" onClick={() => runFormat("h1")}>{t.h1}</button>
+          <button className="context-row" onClick={() => runFormat("h2")}>{t.h2}</button>
+          <button className="context-row" onClick={() => insertRaw("\n$$\nE = mc^2\n$$\n")}>{t.formulaBlock}</button>
         </div>
       )}
 
@@ -744,15 +816,22 @@ export function App() {
         <div className="settings-backdrop" onMouseDown={() => setSettingsOpen(false)}>
           <section className="settings-panel" onMouseDown={(event) => event.stopPropagation()}>
             <header>
-              <strong>{zh.settings}</strong>
-              <button onClick={() => setSettingsOpen(false)}>{zh.close}</button>
+              <strong>{t.settings}</strong>
+              <button onClick={() => setSettingsOpen(false)}>{t.close}</button>
             </header>
             <div className="settings-section">
-              <h3>{zh.shortcuts}</h3>
+              <h3>{t.language}</h3>
+              <select value={language} onChange={(event) => setLanguage(event.target.value as Language)}>
+                <option value="zh-CN">{t.chinese}</option>
+                <option value="en-US">{t.english}</option>
+              </select>
+            </div>
+            <div className="settings-section">
+              <h3>{t.shortcuts}</h3>
               <div className="shortcut-list">
                 {(Object.keys(defaultShortcuts) as ShortcutAction[]).map((action) => (
                   <label key={action} className="shortcut-row">
-                    <span>{shortcutLabels[action]}</span>
+                    <span>{t[shortcutLabelKeys[action]]}</span>
                     <input
                       value={shortcuts[action]}
                       readOnly
@@ -766,10 +845,10 @@ export function App() {
                   </label>
                 ))}
               </div>
-              <button className="settings-secondary" onClick={resetShortcuts}>{zh.resetShortcuts}</button>
+              <button className="settings-secondary" onClick={resetShortcuts}>{t.resetShortcuts}</button>
             </div>
             <div className="settings-section">
-              <h3>{zh.zoom}</h3>
+              <h3>{t.zoom}</h3>
               <input
                 type="range"
                 min="70"
@@ -786,11 +865,11 @@ export function App() {
 
       <footer className="status-bar">
         <span className="breadcrumb" title={filePath || "Untitled.md"}>{compactPath(filePath)}</span>
-        <span>{dirty ? zh.unsaved : zh.saved}</span>
-        <span>{words} {zh.words}</span>
-        <span>{outline.length} {zh.headings}</span>
+        <span>{dirty ? t.unsaved : t.saved}</span>
+        <span>{words} {t.words}</span>
+        <span>{outline.length} {t.headings}</span>
         <span>{zoom}%</span>
-        <span>{viewMode === "split" ? zh.split : viewMode === "source" ? zh.source : zh.preview}</span>
+        <span>{viewMode === "split" ? t.split : viewMode === "source" ? t.source : t.preview}</span>
         <span>{theme}</span>
       </footer>
     </div>
