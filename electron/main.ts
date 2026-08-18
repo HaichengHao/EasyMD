@@ -119,9 +119,17 @@ function createWindow() {
     },
     {
       label: t("\u4e3b\u9898"),
-      submenu: ["Night", "Github", "Newsprint", "Pixyll", "Whitey"].map((name) => ({
-        label: name,
-        click: () => send("menu:theme", name.toLowerCase())
+      submenu: [
+        ["Night", "night"],
+        ["Github", "github"],
+        ["Newsprint", "newsprint"],
+        ["Pixyll", "pixyll"],
+        ["Whitey", "whitey"],
+        ["MyPage Default", "mypage-default"],
+        ["Ink Graffiti", "ink-graffiti"]
+      ].map(([label, value]) => ({
+        label,
+        click: () => send("menu:theme", value)
       }))
     },
     {

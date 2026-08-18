@@ -13,6 +13,7 @@ import {
   Link,
   List,
   ListOrdered,
+  Palette,
   PanelLeftClose,
   PanelLeftOpen,
   Quote,
@@ -20,13 +21,14 @@ import {
   ScrollText,
   Scissors,
   SplitSquareHorizontal,
-  Trash2
+  Trash2,
+  Upload
 } from "lucide-react";
 import { applyFormat, FormatCommand } from "./editorCommands";
 import { demoMarkdown, getOutline, renderMarkdown } from "./markdown";
 
 type ViewMode = "source" | "preview" | "split";
-type ThemeName = "night" | "github" | "newsprint" | "pixyll" | "whitey";
+type ThemeName = "night" | "github" | "newsprint" | "pixyll" | "whitey" | "mypage-default" | "ink-graffiti" | "custom";
 
 interface ContextMenuState {
   x: number;
@@ -67,8 +69,21 @@ const zh = {
   h2: "\u4e8c\u7ea7\u6807\u9898",
   formulaBlock: "\u63d2\u5165\u516c\u5f0f\u5757",
   words: "\u8bcd",
-  headings: "\u4e2a\u6807\u9898"
+  headings: "\u4e2a\u6807\u9898",
+  theme: "\u4e3b\u9898",
+  uploadTheme: "\u5bfc\u5165\u4e3b\u9898",
+  invalidTheme: "\u4e3b\u9898 CSS \u4e0d\u53ef\u7528\uff0c\u5df2\u5207\u56de Night\u3002"
 };
+
+const themes: Array<{ value: ThemeName; label: string }> = [
+  { value: "night", label: "Night" },
+  { value: "github", label: "Github" },
+  { value: "newsprint", label: "Newsprint" },
+  { value: "pixyll", label: "Pixyll" },
+  { value: "whitey", label: "Whitey" },
+  { value: "mypage-default", label: "MyPage Default" },
+  { value: "ink-graffiti", label: "Ink Graffiti" }
+];
 
 const toolbar: Array<{ command: FormatCommand; label: string; icon: JSX.Element }> = [
   { command: "bold", label: zh.bold, icon: <Bold size={16} /> },
@@ -105,6 +120,8 @@ export function App() {
   const [sourceLineNumbers, setSourceLineNumbers] = useState(true);
   const [codeLineNumbers, setCodeLineNumbers] = useState(false);
   const [showScrollbars, setShowScrollbars] = useState(true);
+  const [customThemeName, setCustomThemeName] = useState<string>();
+  const customThemeInputRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<HTMLTextAreaElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   const sourceLinesRef = useRef<HTMLDivElement>(null);
@@ -201,6 +218,71 @@ export function App() {
     setContextMenu(null);
   }
 
+  function validateThemeCss(cssText: string) {
+    if (!cssText.trim() || cssText.length > 240_000) return false;
+    if (!/(\.app|:root|--canvas|--paper|--text|--brand)/.test(cssText)) return false;
+    try {
+      const sheet = new CSSStyleSheet();
+      sheet.replaceSync(cssText);
+      return sheet.cssRules.length > 0;
+    } catch {
+      return false;
+    }
+  }
+
+  async function importTheme(file?: File) {
+    if (!file) return;
+    const cssText = await file.text();
+    if (!validateThemeCss(cssText)) {
+      document.getElementById("custom-theme")?.remove();
+      setCustomThemeName(undefined);
+      setTheme("night");
+      localStorage.removeItem("easymd.customThemeCss");
+      localStorage.removeItem("easymd.customThemeName");
+      localStorage.setItem("easymd.theme", "night");
+      window.alert(zh.invalidTheme);
+      return;
+    }
+    const style = document.getElementById("custom-theme") || document.createElement("style");
+    style.id = "custom-theme";
+    style.textContent = cssText;
+    document.head.appendChild(style);
+    const nextName = file.name.replace(/\.css$/i, "");
+    setCustomThemeName(nextName);
+    localStorage.setItem("easymd.customThemeCss", cssText);
+    localStorage.setItem("easymd.customThemeName", nextName);
+    localStorage.setItem("easymd.theme", "custom");
+    setTheme("custom");
+  }
+
+  useEffect(() => {
+    const savedCustomCss = localStorage.getItem("easymd.customThemeCss");
+    const savedCustomName = localStorage.getItem("easymd.customThemeName");
+    if (savedCustomCss && validateThemeCss(savedCustomCss)) {
+      const style = document.getElementById("custom-theme") || document.createElement("style");
+      style.id = "custom-theme";
+      style.textContent = savedCustomCss;
+      document.head.appendChild(style);
+      setCustomThemeName(savedCustomName || "Custom Theme");
+    } else if (savedCustomCss) {
+      document.getElementById("custom-theme")?.remove();
+      localStorage.removeItem("easymd.customThemeCss");
+      localStorage.removeItem("easymd.customThemeName");
+      localStorage.setItem("easymd.theme", "night");
+    }
+
+    const savedTheme = localStorage.getItem("easymd.theme") as ThemeName | null;
+    const builtInTheme = themes.some((item) => item.value === savedTheme);
+    if (savedTheme && (builtInTheme || (savedTheme === "custom" && savedCustomCss && validateThemeCss(savedCustomCss)))) {
+      setTheme(savedTheme);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (theme === "custom" && !customThemeName) return;
+    localStorage.setItem("easymd.theme", theme);
+  }, [theme, customThemeName]);
+
   useEffect(() => {
     window.easyMD.recentFiles().then(setRecentFiles).catch(() => undefined);
     const off = [
@@ -244,7 +326,7 @@ export function App() {
   }, []);
 
   return (
-    <div className={`app theme-${theme} ${showScrollbars ? "" : "hide-scrollbars"}`} onContextMenu={showContextMenu}>
+    <div className={`app theme-${theme} ${theme === "custom" ? "custom-theme" : ""} ${showScrollbars ? "" : "hide-scrollbars"}`} onContextMenu={showContextMenu}>
       <div className="title-strip">
         <img src="./icon.svg" alt="EasyMD" />
         <span>EasyMD</span>
@@ -312,6 +394,28 @@ export function App() {
               <button className={viewMode === "source" ? "active" : ""} title={zh.source} onClick={() => setViewMode("source")}><FileCode2 size={16} /></button>
               <button className={viewMode === "preview" ? "active" : ""} title={zh.preview} onClick={() => setViewMode("preview")}><Eye size={16} /></button>
               <button className={viewMode === "split" ? "active" : ""} title={zh.split} onClick={() => setViewMode("split")}><SplitSquareHorizontal size={16} /></button>
+            </div>
+            <div className="theme-tools">
+              <Palette size={15} />
+              <select
+                title={zh.theme}
+                value={theme === "custom" ? "custom" : theme}
+                onChange={(event) => setTheme(event.target.value as ThemeName)}
+              >
+                {themes.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+                {theme === "custom" && <option value="custom">{customThemeName || "Custom Theme"}</option>}
+              </select>
+              <button title={zh.uploadTheme} onClick={() => customThemeInputRef.current?.click()}><Upload size={16} /></button>
+              <input
+                ref={customThemeInputRef}
+                type="file"
+                accept=".css,text/css"
+                hidden
+                onChange={(event) => {
+                  void importTheme(event.target.files?.[0]);
+                  event.currentTarget.value = "";
+                }}
+              />
             </div>
           </div>
 
