@@ -5,6 +5,8 @@ contextBridge.exposeInMainWorld("easyMD", {
   saveFile: (payload: { filePath?: string; content: string }) => ipcRenderer.invoke("file:save", payload),
   recentFiles: () => ipcRenderer.invoke("file:recent"),
   listThemes: () => ipcRenderer.invoke("theme:list"),
+  refreshThemeMenu: () => ipcRenderer.invoke("theme:refresh-menu"),
+  importThemeFile: () => ipcRenderer.invoke("theme:import-file"),
   appInfo: () => ipcRenderer.invoke("app:info"),
   checkForUpdates: () => ipcRenderer.invoke("app:check-updates"),
   openExternal: (url: string) => ipcRenderer.invoke("app:open-external", url),

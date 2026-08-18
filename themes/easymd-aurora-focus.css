@@ -1,0 +1,59 @@
+/* @theme-name Aurora Focus */
+/* EasyMD custom theme example.
+   English: Import this file from Theme > Import Theme... to test custom themes.
+   中文：可从「主题 > 导入主题...」导入本文件，用于测试自定义主题。 */
+
+.app.custom-theme {
+  --top: #11131a;
+  --title: #11131a;
+  --sidebar: #1e2430;
+  --sidebar-active: #273142;
+  --canvas: #252b35;
+  --paper: #202631;
+  --text: #e7eef9;
+  --muted: #94a3b8;
+  --line: rgba(157, 178, 207, .18);
+  --brand: #7dd3fc;
+}
+
+.app.custom-theme .workspace,
+.app.custom-theme .tool-row,
+.app.custom-theme .source-wrap,
+.app.custom-theme .source-pane,
+.app.custom-theme .preview-pane {
+  background:
+    radial-gradient(circle at 20% 10%, rgba(125, 211, 252, .14), transparent 28%),
+    radial-gradient(circle at 90% 20%, rgba(167, 139, 250, .12), transparent 30%),
+    linear-gradient(180deg, #252b35, #202631 55%, #1c2330);
+}
+
+.app.custom-theme .sidebar {
+  background: linear-gradient(180deg, #202838, #1b2230);
+}
+
+.app.custom-theme .markdown-body h1,
+.app.custom-theme .markdown-body h2,
+.app.custom-theme .markdown-body h3 {
+  color: #f8fbff;
+  text-shadow: 0 1px 0 rgba(125, 211, 252, .25);
+}
+
+.app.custom-theme .markdown-body blockquote {
+  border-left-color: #7dd3fc;
+  background: rgba(125, 211, 252, .08);
+}
+
+.app.custom-theme .md-code-block {
+  border-color: rgba(125, 211, 252, .24);
+  background: #171d27;
+}
+
+.app.custom-theme .md-code-block figcaption span::after {
+  background: linear-gradient(90deg, #7dd3fc, #c4b5fd, #86efac);
+}
+
+.app.custom-theme .tool-group button.active,
+.app.custom-theme .tool-group button:hover {
+  color: #f8fbff;
+  background: rgba(125, 211, 252, .16);
+}

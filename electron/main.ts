@@ -4,6 +4,7 @@ import path from "node:path";
 
 let recentFiles: string[] = [];
 let documentDirty = false;
+let refreshApplicationMenu: (() => void) | undefined;
 const repositoryUrl = "https://github.com/HaichengHao/EasyMD";
 const latestReleaseApi = "https://api.github.com/repos/HaichengHao/EasyMD/releases/latest";
 
@@ -37,6 +38,11 @@ function themeIdFromFile(filePath: string) {
 function themeNameFromCss(cssText: string, filePath: string) {
   const match = cssText.match(/@theme-name\s+(.+?)\s*;?/i);
   return (match?.[1] || path.basename(filePath, path.extname(filePath))).replace(/^["']|["']$/g, "").trim();
+}
+
+function safeThemeFileName(name: string) {
+  const normalized = path.basename(name, path.extname(name)).replace(/[^a-zA-Z0-9_-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+  return `${normalized || "custom-theme"}.css`;
 }
 
 function normalizeVersion(version: string) {
@@ -156,7 +162,9 @@ function createWindow() {
     }
   });
 
-  const template: Electron.MenuItemConstructorOptions[] = [
+  const rebuildMenu = async () => {
+    const userThemes = await readUserThemes().catch(() => []);
+    const template: Electron.MenuItemConstructorOptions[] = [
     {
       label: t("\u6587\u4ef6"),
       submenu: [
@@ -226,8 +234,22 @@ function createWindow() {
           label,
           click: () => send("menu:theme", value)
         })),
+        ...(userThemes.length ? [
+          { type: "separator" as const },
+          { label: t("\u7528\u6237\u4e3b\u9898"), enabled: false },
+          ...userThemes.map((item) => ({
+            label: item.name,
+            click: () => send("menu:theme", item.id)
+          }))
+        ] : []),
         { type: "separator" as const },
-        { label: t("\u5237\u65b0\u4e3b\u9898\u76ee\u5f55"), click: () => send("menu:refresh-themes") },
+        {
+          label: t("\u5237\u65b0\u4e3b\u9898\u76ee\u5f55"),
+          click: () => {
+            void rebuildMenu();
+            send("menu:refresh-themes");
+          }
+        },
         { label: t("\u5bfc\u5165\u4e3b\u9898..."), click: () => send("menu:import-theme") }
       ]
     },
@@ -250,7 +272,11 @@ function createWindow() {
     }
   ];
 
-  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+    Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+  };
+
+  refreshApplicationMenu = () => void rebuildMenu();
+  void rebuildMenu();
 }
 
 app.whenReady().then(createWindow);
@@ -290,6 +316,30 @@ ipcMain.handle("file:save", async (_event, payload: { filePath?: string; content
 
 ipcMain.handle("file:recent", () => getRecentFiles());
 ipcMain.handle("theme:list", () => readUserThemes());
+ipcMain.handle("theme:refresh-menu", () => {
+  refreshApplicationMenu?.();
+});
+ipcMain.handle("theme:import-file", async () => {
+  const result = await dialog.showOpenDialog({
+    properties: ["openFile"],
+    filters: [{ name: "CSS Theme", extensions: ["css"] }]
+  });
+  if (result.canceled || !result.filePaths[0]) return null;
+  const filePath = result.filePaths[0];
+  const cssText = await fs.readFile(filePath, "utf8");
+  const themesDir = await ensureThemesDir();
+  const targetPath = path.join(themesDir, safeThemeFileName(filePath));
+  if (path.resolve(filePath) !== path.resolve(targetPath)) {
+    await fs.writeFile(targetPath, cssText, "utf8");
+  }
+  const storedPath = path.resolve(filePath) === path.resolve(targetPath) ? filePath : targetPath;
+  return {
+    id: themeIdFromFile(storedPath),
+    name: themeNameFromCss(cssText, storedPath),
+    filePath: storedPath,
+    cssText
+  };
+});
 ipcMain.handle("app:info", () => appInfo());
 ipcMain.handle("app:check-updates", () => checkForUpdates());
 ipcMain.handle("app:open-external", async (_event, url: string) => {

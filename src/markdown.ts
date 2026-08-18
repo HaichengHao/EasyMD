@@ -83,18 +83,26 @@ function normalizeLang(lang: string) {
   return (lang || "text").trim().toLowerCase().replace(/[^a-z0-9#+-]/g, "") || "text";
 }
 
+function trimCodeBlock(code: string) {
+  const lines = code.replace(/\r\n/g, "\n").split("\n");
+  while (lines.length > 1 && !lines[0].trim()) lines.shift();
+  while (lines.length > 1 && !lines[lines.length - 1].trim()) lines.pop();
+  return lines.join("\n");
+}
+
 const md = new MarkdownIt({
   html: false,
   linkify: true,
   typographer: true,
   highlight(code, lang): string {
     const normalized = normalizeLang(lang);
+    const compactCode = trimCodeBlock(code);
     const highlighted = normalized !== "text" && hljs.getLanguage(normalized)
-      ? hljs.highlight(code, { language: normalized, ignoreIllegals: true }).value
-      : escapeHtml(code);
+      ? hljs.highlight(compactCode, { language: normalized, ignoreIllegals: true }).value
+      : escapeHtml(compactCode);
     return `<figure class="md-code-block lang-${normalized}" data-lang="${normalized}">
-      <figcaption><span>${languageLabel(normalized)}</span><button type="button" data-copy-code>Copy</button></figcaption>
       <pre><code class="hljs language-${normalized}">${highlighted}</code></pre>
+      <figcaption><span>${languageLabel(normalized)}</span><button type="button" data-copy-code>Copy</button></figcaption>
     </figure>`;
   }
 })
@@ -110,7 +118,7 @@ function addCodeLineNumbers(html: string) {
   const container = document.createElement("div");
   container.innerHTML = html;
   container.querySelectorAll(".md-code-block code").forEach((code) => {
-    const lines = code.innerHTML.replace(/\n$/, "").split("\n");
+    const lines = code.innerHTML.split("\n");
     while (lines.length > 1 && !lines[0].trim()) lines.shift();
     while (lines.length > 1 && !lines[lines.length - 1].trim()) lines.pop();
     code.innerHTML = lines

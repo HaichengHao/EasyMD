@@ -608,9 +608,7 @@ export function App() {
     }
   }
 
-  async function importTheme(file?: File) {
-    if (!file) return;
-    const cssText = await file.text();
+  function applyImportedTheme(cssText: string, nextName: string) {
     if (!validateThemeCss(cssText)) {
       document.getElementById("custom-theme")?.remove();
       setCustomThemeName(undefined);
@@ -623,12 +621,24 @@ export function App() {
     }
     document.getElementById("directory-theme")?.remove();
     applyThemeStyle("custom-theme", cssText);
-    const nextName = file.name.replace(/\.css$/i, "");
     setCustomThemeName(nextName);
     localStorage.setItem("easymd.customThemeCss", cssText);
     localStorage.setItem("easymd.customThemeName", nextName);
     localStorage.setItem("easymd.theme", "custom");
     setTheme("custom");
+  }
+
+  async function importTheme(file?: File) {
+    if (!file) return;
+    applyImportedTheme(await file.text(), file.name.replace(/\.css$/i, ""));
+  }
+
+  async function importThemeFromMenu() {
+    const themeFile = await window.easyMD.importThemeFile();
+    if (!themeFile) return;
+    applyImportedTheme(themeFile.cssText, themeFile.name);
+    await window.easyMD.refreshThemeMenu();
+    await refreshUserThemes(themeFile.id as ThemeName);
   }
 
   function chooseTheme(nextTheme: ThemeName) {
@@ -853,9 +863,9 @@ export function App() {
       window.easyMD.onMenu("menu:save-then-close", () => void saveFile(false, true)),
       window.easyMD.onMenu("menu:save-as", () => void saveFile(true)),
       window.easyMD.onMenu("menu:view", (mode) => setViewMode(mode as ViewMode)),
-      window.easyMD.onMenu("menu:theme", (name) => setTheme(name as ThemeName)),
+      window.easyMD.onMenu("menu:theme", (name) => chooseTheme(name as ThemeName)),
       window.easyMD.onMenu("menu:refresh-themes", () => void refreshUserThemes()),
-      window.easyMD.onMenu("menu:import-theme", () => customThemeInputRef.current?.click()),
+      window.easyMD.onMenu("menu:import-theme", () => void importThemeFromMenu()),
       window.easyMD.onMenu("menu:toggle-sidebar", () => setSidebarOpen((value) => !value)),
       window.easyMD.onMenu("menu:undo", runUndo),
       window.easyMD.onMenu("menu:redo", runRedo),
