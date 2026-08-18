@@ -499,7 +499,7 @@ button { color: inherit; border: 0; background: transparent; cursor: pointer; }
 }
 
 .md-code-block {
-  margin: 20px 0;
+  margin: 16px 0;
   border: 1px solid rgba(148, 163, 184, .22);
   border-radius: 8px;
   overflow: hidden;
@@ -511,7 +511,7 @@ button { color: inherit; border: 0; background: transparent; cursor: pointer; }
   justify-content: space-between;
   align-items: center;
   margin: 0;
-  padding: 8px 14px;
+  padding: 7px 14px;
   border-bottom: 1px solid rgba(148, 163, 184, .18);
   color: #aab6ca;
   font-size: 12px;
@@ -538,27 +538,27 @@ button { color: inherit; border: 0; background: transparent; cursor: pointer; }
   font-size: 11px;
   text-transform: none;
 }
-.md-code-block pre { margin: 0; padding: 18px 20px; overflow: auto; }
+.md-code-block pre { margin: 0; padding: 12px 16px; overflow: auto; }
 .md-code-block code {
   display: block;
   counter-reset: code-line;
   color: #d7dfec;
   background: transparent;
-  font-size: 14px;
-  line-height: 1.8;
+  font-size: 13px;
+  line-height: 1.55;
   font-family: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
 }
 .md-code-block code .code-line {
   display: grid;
-  grid-template-columns: 42px minmax(0, 1fr);
+  grid-template-columns: 34px minmax(0, 1fr);
   counter-increment: code-line;
-  min-height: 25px;
+  min-height: 20px;
 }
 .code-line-number::before {
   content: counter(code-line);
 }
 .code-line-number {
-  padding-right: 14px;
+  padding-right: 12px;
   color: rgba(170, 182, 202, .62);
   text-align: right;
   user-select: none;

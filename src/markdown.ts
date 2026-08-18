@@ -109,9 +109,9 @@ function addCodeLineNumbers(html: string) {
   const container = document.createElement("div");
   container.innerHTML = html;
   container.querySelectorAll(".md-code-block code").forEach((code) => {
-    const lines = (code.textContent || "").replace(/\n$/, "").split("\n");
+    const lines = code.innerHTML.replace(/\n$/, "").split("\n");
     code.innerHTML = lines
-      .map((line) => `<span class="code-line"><span class="code-line-number"></span><span class="code-line-content">${escapeHtml(line) || " "}</span></span>`)
+      .map((line) => `<span class="code-line"><span class="code-line-number"></span><span class="code-line-content">${line || " "}</span></span>`)
       .join("");
   });
   return container.innerHTML;
