@@ -54,6 +54,8 @@ You can set the display name with a comment marker:
 
 EasyMD validates theme CSS before applying it. If the current theme becomes invalid, EasyMD falls back to `Night`.
 
+See the full guide: `docs/custom-themes.md`.
+
 ## Package
 
 Windows packaging is configured with electron-builder:

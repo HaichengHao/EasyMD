@@ -1,4 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { markdown as markdownLanguage } from "@codemirror/lang-markdown";
+import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
+import { Compartment, EditorState } from "@codemirror/state";
+import { EditorView, lineNumbers } from "@codemirror/view";
+import { tags } from "@lezer/highlight";
 import {
   AlignLeft,
   Bold,
@@ -98,6 +103,21 @@ const toolbar: Array<{ command: FormatCommand; label: string; icon: JSX.Element 
   { command: "link", label: zh.link, icon: <Link size={16} /> }
 ];
 
+const sourceHighlightStyle = HighlightStyle.define([
+  { tag: tags.heading, color: "#f9d5ff", fontWeight: "700" },
+  { tag: tags.strong, color: "#f8fafc", fontWeight: "700" },
+  { tag: tags.emphasis, color: "#c4b5fd", fontStyle: "italic" },
+  { tag: tags.monospace, color: "#93c5fd" },
+  { tag: tags.link, color: "#7dd3fc" },
+  { tag: tags.url, color: "#67e8f9" },
+  { tag: tags.quote, color: "#a7f3d0" },
+  { tag: tags.list, color: "#facc15" },
+  { tag: tags.keyword, color: "#fb7185" },
+  { tag: tags.string, color: "#93c5fd" },
+  { tag: tags.number, color: "#facc15" },
+  { tag: tags.comment, color: "#94a3b8", fontStyle: "italic" }
+]);
+
 function fileName(filePath?: string) {
   if (!filePath) return "Untitled.md";
   return filePath.split(/[\\/]/).pop() || filePath;
@@ -126,15 +146,15 @@ export function App() {
   const [customThemeName, setCustomThemeName] = useState<string>();
   const [userThemes, setUserThemes] = useState<EasyMDUserTheme[]>([]);
   const customThemeInputRef = useRef<HTMLInputElement>(null);
-  const editorRef = useRef<HTMLTextAreaElement>(null);
+  const editorRef = useRef<HTMLDivElement>(null);
+  const editorViewRef = useRef<EditorView | null>(null);
+  const lineNumberCompartmentRef = useRef(new Compartment());
   const previewRef = useRef<HTMLDivElement>(null);
-  const sourceLinesRef = useRef<HTMLDivElement>(null);
   const syncing = useRef(false);
 
   const html = useMemo(() => renderMarkdown(markdown, { codeLineNumbers }), [markdown, codeLineNumbers]);
   const outline = useMemo(() => getOutline(markdown), [markdown]);
   const words = useMemo(() => markdown.trim() ? markdown.trim().split(/\s+/).length : 0, [markdown]);
-  const sourceLineCount = useMemo(() => Math.max(1, markdown.split("\n").length), [markdown]);
   const themeClass = theme.startsWith("user:") ? "theme-user" : `theme-${theme}`;
 
   async function openFile() {
@@ -162,29 +182,31 @@ export function App() {
   }
 
   function runFormat(command: FormatCommand) {
-    const editor = editorRef.current;
+    const editor = editorViewRef.current;
     if (!editor) return;
-    const result = applyFormat(markdown, command, editor.selectionStart, editor.selectionEnd);
+    const selection = editor.state.selection.main;
+    const result = applyFormat(markdown, command, selection.from, selection.to);
     setMarkdown(result.value);
     setDirty(true);
     setContextMenu(null);
     requestAnimationFrame(() => {
       editor.focus();
-      editor.setSelectionRange(result.selectionStart, result.selectionEnd);
+      editor.dispatch({ selection: { anchor: result.selectionStart, head: result.selectionEnd } });
     });
   }
 
   function insertRaw(text: string) {
-    const editor = editorRef.current;
+    const editor = editorViewRef.current;
     if (!editor) return;
-    const start = editor.selectionStart;
-    const end = editor.selectionEnd;
+    const selection = editor.state.selection.main;
+    const start = selection.from;
+    const end = selection.to;
     setMarkdown(markdown.slice(0, start) + text + markdown.slice(end));
     setDirty(true);
     setContextMenu(null);
     requestAnimationFrame(() => {
       editor.focus();
-      editor.setSelectionRange(start + text.length, start + text.length);
+      editor.dispatch({ selection: { anchor: start + text.length } });
     });
   }
 
@@ -199,10 +221,6 @@ export function App() {
     });
   }
 
-  function syncSourceLineScroll(scrollTop: number) {
-    if (sourceLinesRef.current) sourceLinesRef.current.scrollTop = scrollTop;
-  }
-
   function showContextMenu(event: React.MouseEvent) {
     if (!(event.target as HTMLElement).closest(".source-pane, .preview-pane")) return;
     event.preventDefault();
@@ -213,13 +231,25 @@ export function App() {
   }
 
   async function nativeEdit(command: "cut" | "copy" | "paste" | "delete") {
-    editorRef.current?.focus();
+    const editor = editorViewRef.current;
+    editor?.focus();
     if (command === "paste") {
       const text = await navigator.clipboard.readText().catch(() => "");
       insertRaw(text);
       return;
     }
-    document.execCommand(command === "delete" ? "delete" : command);
+    if (!editor) return;
+    const selection = editor.state.selection.main;
+    const selectedText = editor.state.sliceDoc(selection.from, selection.to);
+    if (command === "copy" || command === "cut") {
+      await navigator.clipboard.writeText(selectedText).catch(() => undefined);
+    }
+    if (command === "cut" || command === "delete") {
+      editor.dispatch({
+        changes: { from: selection.from, to: selection.to, insert: "" },
+        selection: { anchor: selection.from }
+      });
+    }
     setContextMenu(null);
   }
 
@@ -326,6 +356,55 @@ export function App() {
     if (theme === "custom" && !customThemeName) return;
     localStorage.setItem("easymd.theme", theme);
   }, [theme, customThemeName]);
+
+  useEffect(() => {
+    if (!editorRef.current || editorViewRef.current) return;
+    const lineNumberCompartment = lineNumberCompartmentRef.current;
+    const view = new EditorView({
+      parent: editorRef.current,
+      state: EditorState.create({
+        doc: markdown,
+        extensions: [
+          markdownLanguage(),
+          syntaxHighlighting(sourceHighlightStyle),
+          lineNumberCompartment.of(sourceLineNumbers ? lineNumbers() : []),
+          EditorView.lineWrapping,
+          EditorView.domEventHandlers({
+            scroll: (_event, view) => {
+              if (previewRef.current) syncScroll(view.scrollDOM, previewRef.current);
+            }
+          }),
+          EditorView.updateListener.of((update) => {
+            if (update.docChanged) {
+              setMarkdown(update.state.doc.toString());
+              setDirty(true);
+            }
+          })
+        ]
+      })
+    });
+    editorViewRef.current = view;
+    return () => {
+      view.destroy();
+      editorViewRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    const view = editorViewRef.current;
+    if (!view) return;
+    const current = view.state.doc.toString();
+    if (current === markdown) return;
+    view.dispatch({
+      changes: { from: 0, to: current.length, insert: markdown }
+    });
+  }, [markdown]);
+
+  useEffect(() => {
+    editorViewRef.current?.dispatch({
+      effects: lineNumberCompartmentRef.current.reconfigure(sourceLineNumbers ? lineNumbers() : [])
+    });
+  }, [sourceLineNumbers]);
 
   useEffect(() => {
     window.easyMD.recentFiles().then(setRecentFiles).catch(() => undefined);
@@ -464,25 +543,7 @@ export function App() {
           <section className={`document-grid mode-${viewMode}`}>
             {(viewMode === "source" || viewMode === "split") && (
               <div className={`source-wrap ${sourceLineNumbers ? "with-line-numbers" : ""}`}>
-                {sourceLineNumbers && (
-                  <div className="source-line-numbers" ref={sourceLinesRef} aria-hidden="true">
-                    {Array.from({ length: sourceLineCount }, (_, index) => <span key={index}>{index + 1}</span>)}
-                  </div>
-                )}
-                <textarea
-                  ref={editorRef}
-                  className="source-pane"
-                  value={markdown}
-                  spellCheck={false}
-                  onChange={(event) => {
-                    setMarkdown(event.target.value);
-                    setDirty(true);
-                  }}
-                  onScroll={(event) => {
-                    syncSourceLineScroll(event.currentTarget.scrollTop);
-                    if (previewRef.current) syncScroll(event.currentTarget, previewRef.current);
-                  }}
-                />
+                <div ref={editorRef} className="source-pane" />
               </div>
             )}
             {(viewMode === "preview" || viewMode === "split") && (
@@ -490,7 +551,7 @@ export function App() {
                 ref={previewRef}
                 className="preview-pane markdown-body"
                 dangerouslySetInnerHTML={{ __html: html }}
-                onScroll={(event) => editorRef.current && syncScroll(event.currentTarget, editorRef.current)}
+                onScroll={(event) => editorViewRef.current && syncScroll(event.currentTarget, editorViewRef.current.scrollDOM)}
               />
             )}
           </section>
