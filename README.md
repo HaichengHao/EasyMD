@@ -13,6 +13,8 @@ EasyMD is a lightweight cross-platform desktop Markdown editor inspired by Typor
 - Local file open/save support
 - Theme presets
 - Custom themes from the local `themes/` folder
+- Customizable keyboard shortcuts
+- Draggable split-view divider
 
 ## Run Locally
 
@@ -55,6 +57,12 @@ You can set the display name with a comment marker:
 EasyMD validates theme CSS before applying it. If the current theme becomes invalid, EasyMD falls back to `Night`.
 
 See the full guide: `docs/custom-themes.md`.
+
+## Shortcuts
+
+EasyMD ships with common defaults such as `Ctrl+S` for save, `Ctrl+O` for open, `Ctrl+B` for bold, and `Ctrl + mouse wheel` for editor zoom.
+
+Open Settings from the toolbar, or press `Ctrl+,`, to customize shortcuts when they conflict with system or app-level shortcuts on your computer.
 
 ## Package
 

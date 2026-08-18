@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import { markdown as markdownLanguage } from "@codemirror/lang-markdown";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { Compartment, EditorState } from "@codemirror/state";
@@ -25,6 +26,7 @@ import {
   RefreshCcw,
   Save,
   ScrollText,
+  Settings,
   Scissors,
   SplitSquareHorizontal,
   Trash2,
@@ -36,6 +38,7 @@ import { demoMarkdown, getOutline, renderMarkdown } from "./markdown";
 type ViewMode = "source" | "preview" | "split";
 type BuiltInThemeName = "night" | "github" | "newsprint" | "pixyll" | "whitey" | "mypage-default" | "ink-graffiti";
 type ThemeName = BuiltInThemeName | "custom" | `user:${string}`;
+type ShortcutAction = "save" | "open" | "newFile" | "bold" | "italic" | "link" | "codeBlock" | "source" | "preview" | "split" | "toggleSidebar" | "settings";
 
 interface ContextMenuState {
   x: number;
@@ -80,6 +83,11 @@ const zh = {
   theme: "\u4e3b\u9898",
   uploadTheme: "\u5bfc\u5165\u4e3b\u9898",
   refreshThemes: "\u5237\u65b0\u4e3b\u9898\u76ee\u5f55",
+  settings: "\u8bbe\u7f6e",
+  shortcuts: "\u5feb\u6377\u952e",
+  resetShortcuts: "\u6062\u590d\u9ed8\u8ba4",
+  close: "\u5173\u95ed",
+  zoom: "\u7f29\u653e",
   invalidTheme: "\u4e3b\u9898 CSS \u4e0d\u53ef\u7528\uff0c\u5df2\u5207\u56de Night\u3002"
 };
 
@@ -102,6 +110,36 @@ const toolbar: Array<{ command: FormatCommand; label: string; icon: JSX.Element 
   { command: "code", label: zh.codeBlock, icon: <Code2 size={16} /> },
   { command: "link", label: zh.link, icon: <Link size={16} /> }
 ];
+
+const defaultShortcuts: Record<ShortcutAction, string> = {
+  save: "Ctrl+S",
+  open: "Ctrl+O",
+  newFile: "Ctrl+N",
+  bold: "Ctrl+B",
+  italic: "Ctrl+I",
+  link: "Ctrl+K",
+  codeBlock: "Ctrl+Shift+K",
+  source: "Ctrl+/",
+  preview: "Ctrl+Shift+/",
+  split: "Ctrl+Alt+/",
+  toggleSidebar: "Ctrl+Shift+L",
+  settings: "Ctrl+,"
+};
+
+const shortcutLabels: Record<ShortcutAction, string> = {
+  save: "Save",
+  open: "Open",
+  newFile: "New File",
+  bold: "Bold",
+  italic: "Italic",
+  link: "Link",
+  codeBlock: "Code Block",
+  source: "Source View",
+  preview: "Preview View",
+  split: "Split View",
+  toggleSidebar: "Toggle Sidebar",
+  settings: "Settings"
+};
 
 const sourceHighlightStyle = HighlightStyle.define([
   { tag: tags.heading, color: "#f9d5ff", fontWeight: "700" },
@@ -130,6 +168,26 @@ function compactPath(filePath?: string) {
   return `... / ${parts[parts.length - 2]} / ${parts[parts.length - 1]}`;
 }
 
+function loadShortcuts() {
+  try {
+    const saved = JSON.parse(localStorage.getItem("easymd.shortcuts") || "{}") as Partial<Record<ShortcutAction, string>>;
+    return { ...defaultShortcuts, ...saved };
+  } catch {
+    return defaultShortcuts;
+  }
+}
+
+function eventToShortcut(event: KeyboardEvent | React.KeyboardEvent) {
+  const parts: string[] = [];
+  if (event.ctrlKey || event.metaKey) parts.push("Ctrl");
+  if (event.altKey) parts.push("Alt");
+  if (event.shiftKey) parts.push("Shift");
+  const rawKey = event.key === " " ? "Space" : event.key;
+  const key = rawKey.length === 1 ? rawKey.toUpperCase() : rawKey[0].toUpperCase() + rawKey.slice(1);
+  if (!["Control", "Shift", "Alt", "Meta"].includes(key)) parts.push(key);
+  return parts.join("+");
+}
+
 export function App() {
   const [markdown, setMarkdown] = useState(demoMarkdown());
   const [filePath, setFilePath] = useState<string>();
@@ -143,6 +201,11 @@ export function App() {
   const [sourceLineNumbers, setSourceLineNumbers] = useState(true);
   const [codeLineNumbers, setCodeLineNumbers] = useState(true);
   const [showScrollbars, setShowScrollbars] = useState(true);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [shortcuts, setShortcuts] = useState<Record<ShortcutAction, string>>(() => loadShortcuts());
+  const [zoom, setZoom] = useState(() => Number(localStorage.getItem("easymd.zoom") || 100));
+  const [splitRatio, setSplitRatio] = useState(() => Number(localStorage.getItem("easymd.splitRatio") || 50));
+  const [draggingSplit, setDraggingSplit] = useState(false);
   const [customThemeName, setCustomThemeName] = useState<string>();
   const [userThemes, setUserThemes] = useState<EasyMDUserTheme[]>([]);
   const customThemeInputRef = useRef<HTMLInputElement>(null);
@@ -156,6 +219,10 @@ export function App() {
   const outline = useMemo(() => getOutline(markdown), [markdown]);
   const words = useMemo(() => markdown.trim() ? markdown.trim().split(/\s+/).length : 0, [markdown]);
   const themeClass = theme.startsWith("user:") ? "theme-user" : `theme-${theme}`;
+  const documentStyle = {
+    "--content-zoom": zoom / 100,
+    "--split-left": `${splitRatio}%`
+  } as CSSProperties;
 
   async function openFile() {
     const result = await window.easyMD.openFile();
@@ -331,6 +398,38 @@ export function App() {
     setTheme(nextTheme);
   }
 
+  function updateShortcut(action: ShortcutAction, value: string) {
+    const next = { ...shortcuts, [action]: value };
+    setShortcuts(next);
+    localStorage.setItem("easymd.shortcuts", JSON.stringify(next));
+  }
+
+  function resetShortcuts() {
+    setShortcuts(defaultShortcuts);
+    localStorage.removeItem("easymd.shortcuts");
+  }
+
+  function setZoomLevel(nextZoom: number) {
+    const normalized = Math.min(160, Math.max(70, nextZoom));
+    setZoom(normalized);
+    localStorage.setItem("easymd.zoom", String(normalized));
+  }
+
+  function runShortcutAction(action: ShortcutAction) {
+    if (action === "save") void saveFile(false);
+    if (action === "open") void openFile();
+    if (action === "newFile") newFile();
+    if (action === "bold") runFormat("bold");
+    if (action === "italic") runFormat("italic");
+    if (action === "link") runFormat("link");
+    if (action === "codeBlock") runFormat("code");
+    if (action === "source") setViewMode("source");
+    if (action === "preview") setViewMode("preview");
+    if (action === "split") setViewMode("split");
+    if (action === "toggleSidebar") setSidebarOpen((value) => !value);
+    if (action === "settings") setSettingsOpen(true);
+  }
+
   useEffect(() => {
     const savedCustomCss = localStorage.getItem("easymd.customThemeCss");
     const savedCustomName = localStorage.getItem("easymd.customThemeName");
@@ -358,6 +457,54 @@ export function App() {
   }, [theme, customThemeName]);
 
   useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const shortcut = eventToShortcut(event);
+      const match = (Object.entries(shortcuts) as Array<[ShortcutAction, string]>).find(([, value]) => value === shortcut);
+      if (!match) return;
+      event.preventDefault();
+      runShortcutAction(match[0]);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [shortcuts, markdown, filePath, viewMode, sidebarOpen]);
+
+  useEffect(() => {
+    const onWheel = (event: WheelEvent) => {
+      if (!event.ctrlKey) return;
+      if (!(event.target as HTMLElement).closest(".editor-shell")) return;
+      event.preventDefault();
+      setZoomLevel(zoom + (event.deltaY < 0 ? 5 : -5));
+    };
+    window.addEventListener("wheel", onWheel, { passive: false });
+    return () => window.removeEventListener("wheel", onWheel);
+  }, [zoom]);
+
+  useEffect(() => {
+    if (!draggingSplit) return;
+    const onMouseMove = (event: MouseEvent) => {
+      const grid = document.querySelector(".document-grid.mode-split");
+      if (!grid) return;
+      const rect = grid.getBoundingClientRect();
+      const next = ((event.clientX - rect.left) / rect.width) * 100;
+      const normalized = Math.min(75, Math.max(25, next));
+      setSplitRatio(normalized);
+      localStorage.setItem("easymd.splitRatio", String(normalized));
+    };
+    const onMouseUp = () => setDraggingSplit(false);
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+  }, [draggingSplit]);
+
+  useEffect(() => {
+    if (viewMode === "preview") {
+      editorViewRef.current?.destroy();
+      editorViewRef.current = null;
+      return;
+    }
     if (!editorRef.current || editorViewRef.current) return;
     const lineNumberCompartment = lineNumberCompartmentRef.current;
     const view = new EditorView({
@@ -388,7 +535,7 @@ export function App() {
       view.destroy();
       editorViewRef.current = null;
     };
-  }, []);
+  }, [viewMode]);
 
   useEffect(() => {
     const view = editorViewRef.current;
@@ -505,12 +652,13 @@ export function App() {
               ))}
             </div>
             <div className="tool-group mode-group">
-              <button className={showScrollbars ? "active" : ""} title="显示滚动条" onClick={() => setShowScrollbars((value) => !value)}><ScrollText size={16} /></button>
-              <button className={sourceLineNumbers ? "active" : ""} title="源码行号" onClick={() => setSourceLineNumbers((value) => !value)}><ListOrdered size={16} /></button>
-              <button className={codeLineNumbers ? "active" : ""} title="代码块行号" onClick={() => setCodeLineNumbers((value) => !value)}><Code2 size={16} /></button>
+              <button className={showScrollbars ? "active" : ""} title="Show scrollbars" onClick={() => setShowScrollbars((value) => !value)}><ScrollText size={16} /></button>
+              <button className={sourceLineNumbers ? "active" : ""} title="Source line numbers" onClick={() => setSourceLineNumbers((value) => !value)}><ListOrdered size={16} /></button>
+              <button className={codeLineNumbers ? "active" : ""} title="Code block line numbers" onClick={() => setCodeLineNumbers((value) => !value)}><Code2 size={16} /></button>
               <button className={viewMode === "source" ? "active" : ""} title={zh.source} onClick={() => setViewMode("source")}><FileCode2 size={16} /></button>
               <button className={viewMode === "preview" ? "active" : ""} title={zh.preview} onClick={() => setViewMode("preview")}><Eye size={16} /></button>
               <button className={viewMode === "split" ? "active" : ""} title={zh.split} onClick={() => setViewMode("split")}><SplitSquareHorizontal size={16} /></button>
+              <button className={settingsOpen ? "active" : ""} title={zh.settings} onClick={() => setSettingsOpen(true)}><Settings size={16} /></button>
             </div>
             <div className="theme-tools">
               <Palette size={15} />
@@ -540,11 +688,19 @@ export function App() {
             </div>
           </div>
 
-          <section className={`document-grid mode-${viewMode}`}>
+          <section className={`document-grid mode-${viewMode}`} style={documentStyle}>
             {(viewMode === "source" || viewMode === "split") && (
               <div className={`source-wrap ${sourceLineNumbers ? "with-line-numbers" : ""}`}>
                 <div ref={editorRef} className="source-pane" />
               </div>
+            )}
+            {viewMode === "split" && (
+              <div
+                className={draggingSplit ? "split-resizer dragging" : "split-resizer"}
+                role="separator"
+                aria-orientation="vertical"
+                onMouseDown={() => setDraggingSplit(true)}
+              />
             )}
             {(viewMode === "preview" || viewMode === "split") && (
               <div
@@ -584,11 +740,56 @@ export function App() {
         </div>
       )}
 
+      {settingsOpen && (
+        <div className="settings-backdrop" onMouseDown={() => setSettingsOpen(false)}>
+          <section className="settings-panel" onMouseDown={(event) => event.stopPropagation()}>
+            <header>
+              <strong>{zh.settings}</strong>
+              <button onClick={() => setSettingsOpen(false)}>{zh.close}</button>
+            </header>
+            <div className="settings-section">
+              <h3>{zh.shortcuts}</h3>
+              <div className="shortcut-list">
+                {(Object.keys(defaultShortcuts) as ShortcutAction[]).map((action) => (
+                  <label key={action} className="shortcut-row">
+                    <span>{shortcutLabels[action]}</span>
+                    <input
+                      value={shortcuts[action]}
+                      readOnly
+                      onKeyDown={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        const next = eventToShortcut(event);
+                        if (next) updateShortcut(action, next);
+                      }}
+                    />
+                  </label>
+                ))}
+              </div>
+              <button className="settings-secondary" onClick={resetShortcuts}>{zh.resetShortcuts}</button>
+            </div>
+            <div className="settings-section">
+              <h3>{zh.zoom}</h3>
+              <input
+                type="range"
+                min="70"
+                max="160"
+                step="5"
+                value={zoom}
+                onChange={(event) => setZoomLevel(Number(event.target.value))}
+              />
+              <span>{zoom}%</span>
+            </div>
+          </section>
+        </div>
+      )}
+
       <footer className="status-bar">
         <span className="breadcrumb" title={filePath || "Untitled.md"}>{compactPath(filePath)}</span>
         <span>{dirty ? zh.unsaved : zh.saved}</span>
         <span>{words} {zh.words}</span>
         <span>{outline.length} {zh.headings}</span>
+        <span>{zoom}%</span>
         <span>{viewMode === "split" ? zh.split : viewMode === "source" ? zh.source : zh.preview}</span>
         <span>{theme}</span>
       </footer>

@@ -335,8 +335,27 @@ button { color: inherit; border: 0; background: transparent; cursor: pointer; }
   display: grid;
   background: var(--canvas);
 }
-.document-grid.mode-split { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.document-grid.mode-split { grid-template-columns: minmax(220px, var(--split-left)) 6px minmax(220px, 1fr); }
 .document-grid.mode-source, .document-grid.mode-preview { grid-template-columns: minmax(0, 1fr); }
+
+.split-resizer {
+  position: relative;
+  z-index: 3;
+  width: 6px;
+  min-width: 6px;
+  cursor: col-resize;
+  background: color-mix(in srgb, var(--line), transparent 12%);
+}
+.split-resizer::after {
+  content: "";
+  position: absolute;
+  inset: 0 2px;
+  background: transparent;
+}
+.split-resizer:hover::after,
+.split-resizer.dragging::after {
+  background: linear-gradient(180deg, #60a5fa, #a78bfa 48%, #2dd4bf);
+}
 
 .source-wrap, .source-pane, .preview-pane {
   width: 100%;
@@ -360,7 +379,7 @@ button { color: inherit; border: 0; background: transparent; cursor: pointer; }
   height: 100%;
   color: var(--text);
   background: transparent;
-  font: 15px/1.75 "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+  font: calc(15px * var(--content-zoom)) / 1.75 "Cascadia Code", "JetBrains Mono", Consolas, monospace;
 }
 .source-pane .cm-scroller {
   overflow: auto;
@@ -393,6 +412,7 @@ button { color: inherit; border: 0; background: transparent; cursor: pointer; }
   background: rgba(125, 211, 252, .24);
 }
 .preview-pane {
+  font-size: calc(16px * var(--content-zoom));
   padding: 34px min(7vw, 88px);
   background: var(--paper);
 }
@@ -460,6 +480,80 @@ button { color: inherit; border: 0; background: transparent; cursor: pointer; }
   width: 100%;
   padding: 0 10px;
   text-align: left;
+}
+
+.settings-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  background: rgba(2, 6, 23, .46);
+}
+.settings-panel {
+  width: min(560px, calc(100vw - 32px));
+  max-height: min(720px, calc(100vh - 48px));
+  overflow: auto;
+  color: var(--text);
+  background: color-mix(in srgb, var(--paper), #000 8%);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 22px 60px rgba(0, 0, 0, .38);
+}
+.settings-panel header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.settings-panel header strong {
+  font-size: 16px;
+}
+.settings-panel header button,
+.settings-secondary {
+  padding: 6px 10px;
+  border-radius: 5px;
+  color: var(--text);
+  background: rgba(148, 163, 184, .14);
+}
+.settings-section {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-bottom: 1px solid var(--line);
+}
+.settings-section:last-child { border-bottom: 0; }
+.settings-section h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+}
+.shortcut-list {
+  display: grid;
+  gap: 8px;
+}
+.shortcut-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 168px;
+  align-items: center;
+  gap: 12px;
+}
+.shortcut-row span {
+  color: var(--muted);
+}
+.shortcut-row input {
+  height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  color: var(--text);
+  background: rgba(15, 23, 42, .18);
+  padding: 0 8px;
+  outline: none;
+  font: 13px "Cascadia Code", Consolas, monospace;
+}
+.settings-section input[type="range"] {
+  width: 100%;
 }
 
 .markdown-body {
