@@ -372,8 +372,6 @@ export function App() {
   return (
     <div className={`app ${themeClass} ${theme === "custom" ? "custom-theme" : ""} ${showScrollbars ? "" : "hide-scrollbars"}`} onContextMenu={showContextMenu}>
       <div className="title-strip">
-        <img src="./icon.svg" alt="EasyMD" />
-        <span>EasyMD</span>
         <strong>{dirty ? zh.unsaved : zh.saved}</strong>
       </div>
 

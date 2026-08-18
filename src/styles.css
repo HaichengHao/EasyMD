@@ -561,6 +561,8 @@ button { color: inherit; border: 0; background: transparent; cursor: pointer; }
 }
 .md-code-block pre { margin: 0; padding: 18px 20px; overflow: auto; }
 .md-code-block code {
+  display: block;
+  counter-reset: code-line;
   color: #d7dfec;
   background: transparent;
   font-size: 14px;
@@ -572,9 +574,6 @@ button { color: inherit; border: 0; background: transparent; cursor: pointer; }
   grid-template-columns: 42px minmax(0, 1fr);
   counter-increment: code-line;
   min-height: 25px;
-}
-.md-code-block code {
-  counter-reset: code-line;
 }
 .code-line-number::before {
   content: counter(code-line);
