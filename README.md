@@ -72,15 +72,32 @@ Windows packaging is configured with electron-builder:
 npm run dist:win
 ```
 
-This creates `release/EasyMD_installer.exe` and `release/EasyMD_portable.exe`.
+This creates `release/win_x86_64_installer.exe`.
 
-Linux packaging is configured for AppImage, deb, and rpm:
+Linux packaging is configured for deb and AppImage:
 
 ```bash
 npm run dist:linux
 ```
 
-Linux artifacts are written to `release/`. Build Linux packages on Linux or in CI for the most reliable result.
+This creates `release/easymd.deb` and `release/easymd.AppImage`.
+
+## Publish A GitHub Release
+
+Release builds are automated with GitHub Actions. Push a version tag and GitHub will build the Windows installer and Linux packages, then create a draft release with downloadable assets.
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+After the workflow finishes, open the draft release on GitHub, review the notes, and publish it.
+
+Release assets:
+
+- `win_x86_64_installer.exe` for Windows x86_64 users
+- `easymd.deb` for Debian/Ubuntu users
+- `easymd.AppImage` for general Linux users
 
 ## Project Layout
 

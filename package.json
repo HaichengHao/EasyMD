@@ -10,8 +10,8 @@
     "build": "tsc && vite build && npm run build:electron",
     "build:electron": "tsup electron/main.ts electron/preload.ts --format cjs --out-dir dist-electron --clean --external electron",
     "dist": "npm run build && electron-builder",
-    "dist:win": "npm run build && electron-builder --win nsis portable",
-    "dist:linux": "npm run build && electron-builder --linux AppImage deb rpm",
+    "dist:win": "npm run build && electron-builder --win nsis",
+    "dist:linux": "npm run build && electron-builder --linux deb AppImage",
     "dist:all": "npm run build && electron-builder --win nsis portable --linux AppImage deb rpm",
     "preview": "vite preview --host 127.0.0.1",
     "start": "electron ."
@@ -38,7 +38,7 @@
         "portable"
       ],
       "icon": "assets/icon.png",
-      "artifactName": "${productName}_installer.${ext}"
+      "artifactName": "win_x86_64_installer.${ext}"
     },
     "portable": {
       "artifactName": "${productName}_portable.${ext}"
@@ -52,14 +52,14 @@
     },
     "linux": {
       "target": [
-        "AppImage",
         "deb",
-        "rpm"
+        "AppImage"
       ],
       "icon": "assets/icon.png",
       "category": "Office",
       "maintainer": "EasyMD Contributors",
-      "executableName": "easymd"
+      "executableName": "easymd",
+      "artifactName": "easymd.${ext}"
     }
   },
   "dependencies": {
