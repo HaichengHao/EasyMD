@@ -101,13 +101,17 @@ export function App() {
   const [sidebarTab, setSidebarTab] = useState<"files" | "outline">("files");
   const [recentFiles, setRecentFiles] = useState<string[]>([]);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const [sourceLineNumbers, setSourceLineNumbers] = useState(true);
+  const [codeLineNumbers, setCodeLineNumbers] = useState(false);
   const editorRef = useRef<HTMLTextAreaElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
+  const sourceLinesRef = useRef<HTMLDivElement>(null);
   const syncing = useRef(false);
 
-  const html = useMemo(() => renderMarkdown(markdown), [markdown]);
+  const html = useMemo(() => renderMarkdown(markdown, { codeLineNumbers }), [markdown, codeLineNumbers]);
   const outline = useMemo(() => getOutline(markdown), [markdown]);
   const words = useMemo(() => markdown.trim() ? markdown.trim().split(/\s+/).length : 0, [markdown]);
+  const sourceLineCount = useMemo(() => Math.max(1, markdown.split("\n").length), [markdown]);
 
   async function openFile() {
     const result = await window.easyMD.openFile();
@@ -118,12 +122,13 @@ export function App() {
     setDirty(false);
   }
 
-  async function saveFile(forceSaveAs = false) {
+  async function saveFile(forceSaveAs = false, closeAfterSave = false) {
     const result = await window.easyMD.saveFile({ filePath: forceSaveAs ? undefined : filePath, content: markdown });
     if (!result) return;
     setFilePath(result.filePath);
     setRecentFiles(result.recentFiles);
     setDirty(false);
+    if (closeAfterSave) window.easyMD.closeAfterSave();
   }
 
   function newFile() {
@@ -170,6 +175,10 @@ export function App() {
     });
   }
 
+  function syncSourceLineScroll(scrollTop: number) {
+    if (sourceLinesRef.current) sourceLinesRef.current.scrollTop = scrollTop;
+  }
+
   function showContextMenu(event: React.MouseEvent) {
     if (!(event.target as HTMLElement).closest(".source-pane, .preview-pane")) return;
     event.preventDefault();
@@ -196,6 +205,7 @@ export function App() {
       window.easyMD.onMenu("menu:new", newFile),
       window.easyMD.onMenu("menu:open", openFile),
       window.easyMD.onMenu("menu:save", () => void saveFile(false)),
+      window.easyMD.onMenu("menu:save-then-close", () => void saveFile(false, true)),
       window.easyMD.onMenu("menu:save-as", () => void saveFile(true)),
       window.easyMD.onMenu("menu:view", (mode) => setViewMode(mode as ViewMode)),
       window.easyMD.onMenu("menu:theme", (name) => setTheme(name as ThemeName)),
@@ -204,6 +214,10 @@ export function App() {
     ];
     return () => off.forEach((dispose) => dispose());
   });
+
+  useEffect(() => {
+    window.easyMD.setDirty(dirty);
+  }, [dirty]);
 
   useEffect(() => {
     const hide = () => setContextMenu(null);
@@ -290,6 +304,8 @@ export function App() {
               ))}
             </div>
             <div className="tool-group mode-group">
+              <button className={sourceLineNumbers ? "active" : ""} title="源码行号" onClick={() => setSourceLineNumbers((value) => !value)}><ListOrdered size={16} /></button>
+              <button className={codeLineNumbers ? "active" : ""} title="代码块行号" onClick={() => setCodeLineNumbers((value) => !value)}><Code2 size={16} /></button>
               <button className={viewMode === "source" ? "active" : ""} title={zh.source} onClick={() => setViewMode("source")}><FileCode2 size={16} /></button>
               <button className={viewMode === "preview" ? "active" : ""} title={zh.preview} onClick={() => setViewMode("preview")}><Eye size={16} /></button>
               <button className={viewMode === "split" ? "active" : ""} title={zh.split} onClick={() => setViewMode("split")}><SplitSquareHorizontal size={16} /></button>
@@ -298,17 +314,27 @@ export function App() {
 
           <section className={`document-grid mode-${viewMode}`}>
             {(viewMode === "source" || viewMode === "split") && (
-              <textarea
-                ref={editorRef}
-                className="source-pane"
-                value={markdown}
-                spellCheck={false}
-                onChange={(event) => {
-                  setMarkdown(event.target.value);
-                  setDirty(true);
-                }}
-                onScroll={(event) => previewRef.current && syncScroll(event.currentTarget, previewRef.current)}
-              />
+              <div className={`source-wrap ${sourceLineNumbers ? "with-line-numbers" : ""}`}>
+                {sourceLineNumbers && (
+                  <div className="source-line-numbers" ref={sourceLinesRef} aria-hidden="true">
+                    {Array.from({ length: sourceLineCount }, (_, index) => <span key={index}>{index + 1}</span>)}
+                  </div>
+                )}
+                <textarea
+                  ref={editorRef}
+                  className="source-pane"
+                  value={markdown}
+                  spellCheck={false}
+                  onChange={(event) => {
+                    setMarkdown(event.target.value);
+                    setDirty(true);
+                  }}
+                  onScroll={(event) => {
+                    syncSourceLineScroll(event.currentTarget.scrollTop);
+                    if (previewRef.current) syncScroll(event.currentTarget, previewRef.current);
+                  }}
+                />
+              </div>
             )}
             {(viewMode === "preview" || viewMode === "split") && (
               <div

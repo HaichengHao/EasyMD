@@ -12,6 +12,10 @@ export interface OutlineItem {
   line: number;
 }
 
+export interface RenderOptions {
+  codeLineNumbers?: boolean;
+}
+
 function slugify(value: string) {
   return value
     .trim()
@@ -84,7 +88,7 @@ const md = new MarkdownIt({
   typographer: true,
   highlight(code, lang): string {
     const normalized = normalizeLang(lang);
-    const highlighted: string = normalized !== "text" && hljs.getLanguage(normalized)
+    const highlighted = normalized !== "text" && hljs.getLanguage(normalized)
       ? hljs.highlight(code, { language: normalized, ignoreIllegals: true }).value
       : escapeHtml(code);
     return `<figure class="md-code-block lang-${normalized}" data-lang="${normalized}">
@@ -101,8 +105,21 @@ const md = new MarkdownIt({
   .use(markdownItKatex)
   .use(markdownItTaskLists, { enabled: true, label: true });
 
-export function renderMarkdown(source: string) {
-  return md.render(source || "");
+function addCodeLineNumbers(html: string) {
+  const container = document.createElement("div");
+  container.innerHTML = html;
+  container.querySelectorAll(".md-code-block code").forEach((code) => {
+    const lines = (code.textContent || "").replace(/\n$/, "").split("\n");
+    code.innerHTML = lines
+      .map((line) => `<span class="code-line"><span class="code-line-number"></span><span class="code-line-content">${escapeHtml(line) || " "}</span></span>`)
+      .join("");
+  });
+  return container.innerHTML;
+}
+
+export function renderMarkdown(source: string, options: RenderOptions = {}) {
+  const html = md.render(source || "");
+  return options.codeLineNumbers ? addCodeLineNumbers(html) : html;
 }
 
 export function demoMarkdown() {

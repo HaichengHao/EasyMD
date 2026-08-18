@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 let recentFiles: string[] = [];
+let documentDirty = false;
 
 function t(value: string) {
   return value;
@@ -39,6 +40,27 @@ function createWindow() {
   }
 
   const send = (channel: string, payload?: unknown) => win.webContents.send(channel, payload);
+
+  win.on("close", (event) => {
+    if (!documentDirty) return;
+    const choice = dialog.showMessageBoxSync(win, {
+      type: "warning",
+      buttons: [t("\u53d6\u6d88"), t("\u4e0d\u4fdd\u5b58"), t("\u4fdd\u5b58")],
+      defaultId: 2,
+      cancelId: 0,
+      title: "EasyMD",
+      message: t("\u6587\u6863\u8fd8\u6ca1\u6709\u4fdd\u5b58"),
+      detail: t("\u5173\u95ed\u524d\u8981\u4fdd\u5b58\u5f53\u524d Markdown \u6587\u6863\u5417\uff1f")
+    });
+    if (choice === 0) {
+      event.preventDefault();
+      return;
+    }
+    if (choice === 2) {
+      event.preventDefault();
+      send("menu:save-then-close");
+    }
+  });
 
   const template: Electron.MenuItemConstructorOptions[] = [
     {
@@ -147,3 +169,10 @@ ipcMain.handle("file:save", async (_event, payload: { filePath?: string; content
 });
 
 ipcMain.handle("file:recent", () => getRecentFiles());
+ipcMain.on("document:set-dirty", (_event, dirty: boolean) => {
+  documentDirty = dirty;
+});
+ipcMain.on("document:close-after-save", (event) => {
+  documentDirty = false;
+  BrowserWindow.fromWebContents(event.sender)?.close();
+});
