@@ -121,7 +121,7 @@ export function App() {
   const [recentFiles, setRecentFiles] = useState<string[]>([]);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [sourceLineNumbers, setSourceLineNumbers] = useState(true);
-  const [codeLineNumbers, setCodeLineNumbers] = useState(false);
+  const [codeLineNumbers, setCodeLineNumbers] = useState(true);
   const [showScrollbars, setShowScrollbars] = useState(true);
   const [customThemeName, setCustomThemeName] = useState<string>();
   const [userThemes, setUserThemes] = useState<EasyMDUserTheme[]>([]);
@@ -371,10 +371,6 @@ export function App() {
 
   return (
     <div className={`app ${themeClass} ${theme === "custom" ? "custom-theme" : ""} ${showScrollbars ? "" : "hide-scrollbars"}`} onContextMenu={showContextMenu}>
-      <div className="title-strip">
-        <strong>{dirty ? zh.unsaved : zh.saved}</strong>
-      </div>
-
       <div className="workspace">
         <aside className={sidebarOpen ? "sidebar" : "sidebar collapsed"}>
           <button className="sidebar-toggle" onClick={() => setSidebarOpen((value) => !value)} title={sidebarOpen ? zh.hideSidebar : zh.showSidebar}>
@@ -529,6 +525,7 @@ export function App() {
 
       <footer className="status-bar">
         <span className="breadcrumb" title={filePath || "Untitled.md"}>{compactPath(filePath)}</span>
+        <span>{dirty ? zh.unsaved : zh.saved}</span>
         <span>{words} {zh.words}</span>
         <span>{outline.length} {zh.headings}</span>
         <span>{viewMode === "split" ? zh.split : viewMode === "source" ? zh.source : zh.preview}</span>
