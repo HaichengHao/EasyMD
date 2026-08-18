@@ -4,6 +4,8 @@ import path from "node:path";
 
 let recentFiles: string[] = [];
 let documentDirty = false;
+const repositoryUrl = "https://github.com/HaichengHao/EasyMD";
+const latestReleaseApi = "https://api.github.com/repos/HaichengHao/EasyMD/releases/latest";
 
 interface UserTheme {
   id: string;
@@ -35,6 +37,53 @@ function themeIdFromFile(filePath: string) {
 function themeNameFromCss(cssText: string, filePath: string) {
   const match = cssText.match(/@theme-name\s+(.+?)\s*;?/i);
   return (match?.[1] || path.basename(filePath, path.extname(filePath))).replace(/^["']|["']$/g, "").trim();
+}
+
+function normalizeVersion(version: string) {
+  return version.replace(/^v/i, "").split(/[+-]/)[0];
+}
+
+function compareVersions(a: string, b: string) {
+  const left = normalizeVersion(a).split(".").map((part) => Number(part) || 0);
+  const right = normalizeVersion(b).split(".").map((part) => Number(part) || 0);
+  const length = Math.max(left.length, right.length);
+  for (let index = 0; index < length; index += 1) {
+    const diff = (left[index] || 0) - (right[index] || 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
+function appInfo() {
+  return {
+    name: app.getName(),
+    version: app.getVersion(),
+    repository: repositoryUrl
+  };
+}
+
+async function checkForUpdates() {
+  const currentVersion = app.getVersion();
+  try {
+    const response = await fetch(latestReleaseApi, {
+      headers: {
+        Accept: "application/vnd.github+json",
+        "User-Agent": `EasyMD/${currentVersion}`
+      }
+    });
+    if (!response.ok) return { hasUpdate: false, currentVersion };
+    const latest = await response.json() as { tag_name?: string; html_url?: string; prerelease?: boolean; draft?: boolean };
+    if (!latest.tag_name || latest.prerelease || latest.draft) return { hasUpdate: false, currentVersion };
+    const latestVersion = normalizeVersion(latest.tag_name);
+    return {
+      hasUpdate: compareVersions(latestVersion, currentVersion) > 0,
+      currentVersion,
+      latestVersion,
+      releaseUrl: latest.html_url || `${repositoryUrl}/releases/latest`
+    };
+  } catch {
+    return { hasUpdate: false, currentVersion };
+  }
 }
 
 async function ensureThemesDir() {
@@ -179,7 +228,20 @@ function createWindow() {
     },
     {
       label: t("\u5e2e\u52a9"),
-      submenu: [{ label: "EasyMD", click: () => shell.openExternal("https://github.com/HaichengHao/EasyMD") }]
+      submenu: [
+        { label: t("\u68c0\u67e5\u66f4\u65b0"), click: () => send("menu:check-updates") },
+        { label: "GitHub", click: () => shell.openExternal(repositoryUrl) },
+        {
+          label: t("\u5173\u4e8e EasyMD"),
+          click: () => dialog.showMessageBox(win, {
+            type: "info",
+            title: "EasyMD",
+            message: `EasyMD ${app.getVersion()}`,
+            detail: `${t("\u8f7b\u91cf\u7ea7 Markdown \u684c\u9762\u7f16\u8f91\u5668")}\n${repositoryUrl}`,
+            buttons: [t("\u786e\u5b9a")]
+          })
+        }
+      ]
     }
   ];
 
@@ -223,6 +285,12 @@ ipcMain.handle("file:save", async (_event, payload: { filePath?: string; content
 
 ipcMain.handle("file:recent", () => getRecentFiles());
 ipcMain.handle("theme:list", () => readUserThemes());
+ipcMain.handle("app:info", () => appInfo());
+ipcMain.handle("app:check-updates", () => checkForUpdates());
+ipcMain.handle("app:open-external", async (_event, url: string) => {
+  if (!/^https:\/\/github\.com\/HaichengHao\/EasyMD(\/|$)/.test(url)) return;
+  await shell.openExternal(url);
+});
 ipcMain.on("document:set-dirty", (_event, dirty: boolean) => {
   documentDirty = dirty;
 });

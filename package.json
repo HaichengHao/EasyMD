@@ -37,7 +37,7 @@
         "nsis",
         "portable"
       ],
-      "icon": "assets/icon.png",
+      "icon": "assets/icon.ico",
       "artifactName": "win_x86_64_installer.${ext}"
     },
     "portable": {

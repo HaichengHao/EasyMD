@@ -19,6 +19,9 @@ interface Window {
     saveFile: (payload: { filePath?: string; content: string }) => Promise<EasyMDFileResult | null>;
     recentFiles: () => Promise<string[]>;
     listThemes: () => Promise<EasyMDUserTheme[]>;
+    appInfo: () => Promise<{ name: string; version: string; repository: string }>;
+    checkForUpdates: () => Promise<{ hasUpdate: boolean; currentVersion: string; latestVersion?: string; releaseUrl?: string }>;
+    openExternal: (url: string) => Promise<void>;
     setDirty: (dirty: boolean) => void;
     closeAfterSave: () => void;
     onMenu: (channel: string, callback: (payload?: unknown) => void) => () => void;

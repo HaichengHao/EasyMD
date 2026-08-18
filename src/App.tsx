@@ -8,6 +8,7 @@ import { tags } from "@lezer/highlight";
 import {
   AlignLeft,
   Bold,
+  ChevronDown,
   CheckSquare,
   Clipboard,
   Code2,
@@ -25,12 +26,14 @@ import {
   Quote,
   RefreshCcw,
   Save,
+  Search,
   ScrollText,
   Settings,
   Scissors,
   SplitSquareHorizontal,
   Trash2,
-  Upload
+  Upload,
+  X
 } from "lucide-react";
 import { applyFormat, FormatCommand } from "./editorCommands";
 import { demoMarkdown, getOutline, renderMarkdown } from "./markdown";
@@ -38,7 +41,7 @@ import { demoMarkdown, getOutline, renderMarkdown } from "./markdown";
 type ViewMode = "source" | "preview" | "split";
 type BuiltInThemeName = "night" | "github" | "newsprint" | "pixyll" | "whitey" | "mypage-default" | "ink-graffiti";
 type ThemeName = BuiltInThemeName | "custom" | `user:${string}`;
-type ShortcutAction = "save" | "open" | "newFile" | "bold" | "italic" | "link" | "codeBlock" | "source" | "preview" | "split" | "toggleSidebar" | "settings";
+type ShortcutAction = "save" | "open" | "newFile" | "bold" | "italic" | "link" | "codeBlock" | "source" | "preview" | "split" | "toggleSidebar" | "settings" | "find" | "replace";
 type Language = "zh-CN" | "en-US";
 
 interface ContextMenuState {
@@ -87,6 +90,19 @@ const zh = {
   themesFolder: "\u4e3b\u9898\u6587\u4ef6\u5939",
   customTheme: "\u81ea\u5b9a\u4e49\u4e3b\u9898",
   settings: "\u8bbe\u7f6e",
+  find: "\u67e5\u627e",
+  replace: "\u66ff\u6362",
+  replaceWith: "\u66ff\u6362\u4e3a",
+  previousMatch: "\u4e0a\u4e00\u4e2a",
+  nextMatch: "\u4e0b\u4e00\u4e2a",
+  replaceCurrent: "\u66ff\u6362\u5f53\u524d",
+  replaceAll: "\u5168\u90e8\u66ff\u6362",
+  noMatches: "\u65e0\u5339\u914d",
+  about: "\u5173\u4e8e",
+  version: "\u7248\u672c",
+  updateAvailable: "\u53d1\u73b0 EasyMD \u65b0\u7248\u672c",
+  updateNow: "\u7acb\u5373\u66f4\u65b0",
+  later: "\u7a0d\u540e",
   shortcuts: "\u5feb\u6377\u952e",
   language: "\u8bed\u8a00",
   chinese: "\u7b80\u4f53\u4e2d\u6587",
@@ -142,6 +158,19 @@ const en: typeof zh = {
   themesFolder: "Themes Folder",
   customTheme: "Custom Theme",
   settings: "Settings",
+  find: "Find",
+  replace: "Replace",
+  replaceWith: "Replace with",
+  previousMatch: "Previous",
+  nextMatch: "Next",
+  replaceCurrent: "Replace",
+  replaceAll: "Replace All",
+  noMatches: "No matches",
+  about: "About",
+  version: "Version",
+  updateAvailable: "A new EasyMD version is available",
+  updateNow: "Update Now",
+  later: "Later",
   shortcuts: "Shortcuts",
   language: "Language",
   chinese: "Simplified Chinese",
@@ -166,6 +195,70 @@ const themes: Array<{ value: BuiltInThemeName; label: string }> = [
   { value: "ink-graffiti", label: "Ink Graffiti" }
 ];
 
+interface SelectOption<T extends string> {
+  value: T;
+  label: string;
+  group?: string;
+}
+
+function CustomSelect<T extends string>({
+  title,
+  value,
+  options,
+  onChange,
+  className = ""
+}: {
+  title: string;
+  value: T;
+  options: Array<SelectOption<T>>;
+  onChange: (value: T) => void;
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const active = options.find((item) => item.value === value) || options[0];
+  const groups = options.reduce<Array<{ name?: string; items: Array<SelectOption<T>> }>>((acc, item) => {
+    const last = acc[acc.length - 1];
+    if (last && last.name === item.group) {
+      last.items.push(item);
+    } else {
+      acc.push({ name: item.group, items: [item] });
+    }
+    return acc;
+  }, []);
+
+  return (
+    <div className={`custom-select ${open ? "open" : ""} ${className}`} onBlur={() => setOpen(false)} tabIndex={-1}>
+      <button type="button" title={title} className="custom-select-trigger" onClick={() => setOpen((value) => !value)}>
+        <span>{active?.label}</span>
+        <ChevronDown size={14} />
+      </button>
+      {open && (
+        <div className="custom-select-menu">
+          {groups.map((group, groupIndex) => (
+            <div className="custom-select-group" key={`${group.name || "default"}-${groupIndex}`}>
+              {group.name && <div className="custom-select-label">{group.name}</div>}
+              {group.items.map((item) => (
+                <button
+                  type="button"
+                  key={item.value}
+                  className={item.value === value ? "selected" : ""}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => {
+                    onChange(item.value);
+                    setOpen(false);
+                  }}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const toolbar: Array<{ command: FormatCommand; labelKey: keyof typeof zh; icon: JSX.Element }> = [
   { command: "bold", labelKey: "bold", icon: <Bold size={16} /> },
   { command: "italic", labelKey: "italic", icon: <Italic size={16} /> },
@@ -188,7 +281,9 @@ const defaultShortcuts: Record<ShortcutAction, string> = {
   preview: "Ctrl+Shift+/",
   split: "Ctrl+Alt+/",
   toggleSidebar: "Ctrl+Shift+L",
-  settings: "Ctrl+,"
+  settings: "Ctrl+,",
+  find: "Ctrl+F",
+  replace: "Ctrl+H"
 };
 
 const shortcutLabelKeys: Record<ShortcutAction, keyof typeof zh> = {
@@ -203,7 +298,9 @@ const shortcutLabelKeys: Record<ShortcutAction, keyof typeof zh> = {
   preview: "preview",
   split: "split",
   toggleSidebar: "hideSidebar",
-  settings: "settings"
+  settings: "settings",
+  find: "find",
+  replace: "replace"
 };
 
 const sourceHighlightStyle = HighlightStyle.define([
@@ -267,6 +364,13 @@ export function App() {
   const [codeLineNumbers, setCodeLineNumbers] = useState(true);
   const [showScrollbars, setShowScrollbars] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [findOpen, setFindOpen] = useState(false);
+  const [replaceOpen, setReplaceOpen] = useState(false);
+  const [findQuery, setFindQuery] = useState("");
+  const [replaceText, setReplaceText] = useState("");
+  const [matchIndex, setMatchIndex] = useState(0);
+  const [appInfo, setAppInfo] = useState<{ name: string; version: string; repository: string }>({ name: "EasyMD", version: "0.0.0", repository: "https://github.com/HaichengHao/EasyMD" });
+  const [updateInfo, setUpdateInfo] = useState<{ latestVersion: string; releaseUrl: string } | null>(null);
   const [language, setLanguageState] = useState<Language>(() => (localStorage.getItem("easymd.language") as Language) || "zh-CN");
   const [shortcuts, setShortcuts] = useState<Record<ShortcutAction, string>>(() => loadShortcuts());
   const [zoom, setZoom] = useState(() => Number(localStorage.getItem("easymd.zoom") || 100));
@@ -285,6 +389,27 @@ export function App() {
   const html = useMemo(() => renderMarkdown(markdown, { codeLineNumbers, copyLabel: t.copy }), [markdown, codeLineNumbers, t.copy]);
   const outline = useMemo(() => getOutline(markdown), [markdown]);
   const words = useMemo(() => markdown.trim() ? markdown.trim().split(/\s+/).length : 0, [markdown]);
+  const themeOptions = useMemo<Array<SelectOption<ThemeName>>>(() => [
+    ...themes.map((item) => ({ value: item.value, label: item.label })),
+    ...userThemes.map((item) => ({ value: item.id as ThemeName, label: item.name, group: t.themesFolder })),
+    ...(theme === "custom" ? [{ value: "custom" as ThemeName, label: customThemeName || t.customTheme }] : [])
+  ], [customThemeName, theme, t.customTheme, t.themesFolder, userThemes]);
+  const languageOptions = useMemo<Array<SelectOption<Language>>>(() => [
+    { value: "zh-CN", label: t.chinese },
+    { value: "en-US", label: t.english }
+  ], [t.chinese, t.english]);
+  const findMatches = useMemo(() => {
+    if (!findQuery) return [];
+    const matches: Array<{ from: number; to: number }> = [];
+    const lowerSource = markdown.toLocaleLowerCase();
+    const lowerQuery = findQuery.toLocaleLowerCase();
+    let index = lowerSource.indexOf(lowerQuery);
+    while (index >= 0) {
+      matches.push({ from: index, to: index + findQuery.length });
+      index = lowerSource.indexOf(lowerQuery, index + Math.max(1, findQuery.length));
+    }
+    return matches;
+  }, [findQuery, markdown]);
   const themeClass = theme.startsWith("user:") ? "theme-user" : `theme-${theme}`;
   const documentStyle = {
     "--content-zoom": zoom / 100,
@@ -327,6 +452,54 @@ export function App() {
       editor.focus();
       editor.dispatch({ selection: { anchor: result.selectionStart, head: result.selectionEnd } });
     });
+  }
+
+  function revealMatch(index: number) {
+    const match = findMatches[index];
+    const editor = editorViewRef.current;
+    if (!match || !editor) return;
+    editor.focus();
+    editor.dispatch({
+      selection: { anchor: match.from, head: match.to },
+      effects: EditorView.scrollIntoView(match.from, { y: "center" })
+    });
+  }
+
+  function openFindPanel(showReplace = false) {
+    if (viewMode === "preview") setViewMode("split");
+    setFindOpen(true);
+    setReplaceOpen(showReplace);
+    requestAnimationFrame(() => {
+      document.querySelector<HTMLInputElement>(".find-input")?.focus();
+      document.querySelector<HTMLInputElement>(".find-input")?.select();
+    });
+  }
+
+  function moveMatch(direction: 1 | -1) {
+    if (!findMatches.length) return;
+    const next = (matchIndex + direction + findMatches.length) % findMatches.length;
+    setMatchIndex(next);
+    revealMatch(next);
+  }
+
+  function replaceCurrentMatch() {
+    const match = findMatches[matchIndex];
+    if (!match) return;
+    const next = markdown.slice(0, match.from) + replaceText + markdown.slice(match.to);
+    setMarkdown(next);
+    setDirty(true);
+    requestAnimationFrame(() => {
+      const nextIndex = Math.min(matchIndex, Math.max(0, findMatches.length - 2));
+      setMatchIndex(nextIndex);
+    });
+  }
+
+  function replaceAllMatches() {
+    if (!findQuery || !findMatches.length) return;
+    const escaped = findQuery.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    setMarkdown(markdown.replace(new RegExp(escaped, "gi"), replaceText));
+    setDirty(true);
+    setMatchIndex(0);
   }
 
   function insertRaw(text: string) {
@@ -500,6 +673,20 @@ export function App() {
     if (action === "split") setViewMode("split");
     if (action === "toggleSidebar") setSidebarOpen((value) => !value);
     if (action === "settings") setSettingsOpen(true);
+    if (action === "find") openFindPanel(false);
+    if (action === "replace") openFindPanel(true);
+  }
+
+  async function checkUpdates(showWhenCurrent = false) {
+    const result = await window.easyMD.checkForUpdates();
+    if (result.hasUpdate && result.latestVersion && result.releaseUrl) {
+      const dismissed = localStorage.getItem("easymd.dismissedUpdate");
+      if (showWhenCurrent || dismissed !== result.latestVersion) {
+        setUpdateInfo({ latestVersion: result.latestVersion, releaseUrl: result.releaseUrl });
+      }
+    } else if (showWhenCurrent) {
+      window.alert(`EasyMD ${result.currentVersion}`);
+    }
   }
 
   useEffect(() => {
@@ -527,6 +714,19 @@ export function App() {
     if (theme === "custom" && !customThemeName) return;
     localStorage.setItem("easymd.theme", theme);
   }, [theme, customThemeName]);
+
+  useEffect(() => {
+    if (!findOpen || !findMatches.length) {
+      setMatchIndex(0);
+      return;
+    }
+    const normalized = Math.min(matchIndex, findMatches.length - 1);
+    if (normalized !== matchIndex) {
+      setMatchIndex(normalized);
+      return;
+    }
+    revealMatch(normalized);
+  }, [findOpen, findMatches.length, matchIndex]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -626,6 +826,11 @@ export function App() {
   }, [sourceLineNumbers]);
 
   useEffect(() => {
+    window.easyMD.appInfo().then(setAppInfo).catch(() => undefined);
+    void checkUpdates(false);
+  }, []);
+
+  useEffect(() => {
     window.easyMD.recentFiles().then(setRecentFiles).catch(() => undefined);
     const off = [
       window.easyMD.onMenu("menu:new", newFile),
@@ -636,7 +841,8 @@ export function App() {
       window.easyMD.onMenu("menu:view", (mode) => setViewMode(mode as ViewMode)),
       window.easyMD.onMenu("menu:theme", (name) => setTheme(name as ThemeName)),
       window.easyMD.onMenu("menu:toggle-sidebar", () => setSidebarOpen((value) => !value)),
-      window.easyMD.onMenu("menu:format", (command) => runFormat(command as FormatCommand))
+      window.easyMD.onMenu("menu:format", (command) => runFormat(command as FormatCommand)),
+      window.easyMD.onMenu("menu:check-updates", () => void checkUpdates(true))
     ];
     return () => off.forEach((dispose) => dispose());
   });
@@ -730,21 +936,17 @@ export function App() {
               <button className={viewMode === "source" ? "active" : ""} title={t.source} onClick={() => setViewMode("source")}><FileCode2 size={16} /></button>
               <button className={viewMode === "preview" ? "active" : ""} title={t.preview} onClick={() => setViewMode("preview")}><Eye size={16} /></button>
               <button className={viewMode === "split" ? "active" : ""} title={t.split} onClick={() => setViewMode("split")}><SplitSquareHorizontal size={16} /></button>
+              <button className={findOpen ? "active" : ""} title={t.find} onClick={() => openFindPanel(false)}><Search size={16} /></button>
               <button className={settingsOpen ? "active" : ""} title={t.settings} onClick={() => setSettingsOpen(true)}><Settings size={16} /></button>
             </div>
             <div className="theme-tools">
               <Palette size={15} />
-              <select
+              <CustomSelect
                 title={t.theme}
                 value={theme}
-                onChange={(event) => chooseTheme(event.target.value as ThemeName)}
-              >
-                {themes.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
-                {userThemes.length > 0 && <optgroup label={t.themesFolder}>
-                  {userThemes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                </optgroup>}
-                {theme === "custom" && <option value="custom">{customThemeName || t.customTheme}</option>}
-              </select>
+                options={themeOptions}
+                onChange={chooseTheme}
+              />
               <button title={t.refreshThemes} onClick={() => void refreshUserThemes()}><RefreshCcw size={16} /></button>
               <button title={t.uploadTheme} onClick={() => customThemeInputRef.current?.click()}><Upload size={16} /></button>
               <input
@@ -812,6 +1014,62 @@ export function App() {
         </div>
       )}
 
+      {findOpen && (
+        <section className="find-panel">
+          <div className="find-row">
+            <input
+              className="find-input"
+              value={findQuery}
+              placeholder={t.find}
+              onChange={(event) => {
+                setFindQuery(event.target.value);
+                setMatchIndex(0);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  moveMatch(event.shiftKey ? -1 : 1);
+                }
+                if (event.key === "Escape") setFindOpen(false);
+              }}
+            />
+            <span className="find-count">{findQuery ? (findMatches.length ? `${matchIndex + 1}/${findMatches.length}` : t.noMatches) : ""}</span>
+            <button title={t.previousMatch} onClick={() => moveMatch(-1)}>{t.previousMatch}</button>
+            <button title={t.nextMatch} onClick={() => moveMatch(1)}>{t.nextMatch}</button>
+            <button className={replaceOpen ? "active" : ""} title={t.replace} onClick={() => setReplaceOpen((value) => !value)}>{t.replace}</button>
+            <button title={t.close} onClick={() => setFindOpen(false)}><X size={15} /></button>
+          </div>
+          {replaceOpen && (
+            <div className="find-row replace-row">
+              <input
+                value={replaceText}
+                placeholder={t.replaceWith}
+                onChange={(event) => setReplaceText(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") setFindOpen(false);
+                }}
+              />
+              <button onClick={replaceCurrentMatch}>{t.replaceCurrent}</button>
+              <button onClick={replaceAllMatches}>{t.replaceAll}</button>
+            </div>
+          )}
+        </section>
+      )}
+
+      {updateInfo && (
+        <section className="update-toast">
+          <div>
+            <strong>{t.updateAvailable}</strong>
+            <span>{`EasyMD ${appInfo.version} -> ${updateInfo.latestVersion}`}</span>
+          </div>
+          <button onClick={() => void window.easyMD.openExternal(updateInfo.releaseUrl)}>{t.updateNow}</button>
+          <button onClick={() => {
+            localStorage.setItem("easymd.dismissedUpdate", updateInfo.latestVersion);
+            setUpdateInfo(null);
+          }}>{t.later}</button>
+        </section>
+      )}
+
       {settingsOpen && (
         <div className="settings-backdrop" onMouseDown={() => setSettingsOpen(false)}>
           <section className="settings-panel" onMouseDown={(event) => event.stopPropagation()}>
@@ -821,10 +1079,13 @@ export function App() {
             </header>
             <div className="settings-section">
               <h3>{t.language}</h3>
-              <select value={language} onChange={(event) => setLanguage(event.target.value as Language)}>
-                <option value="zh-CN">{t.chinese}</option>
-                <option value="en-US">{t.english}</option>
-              </select>
+              <CustomSelect
+                title={t.language}
+                value={language}
+                options={languageOptions}
+                onChange={setLanguage}
+                className="settings-select"
+              />
             </div>
             <div className="settings-section">
               <h3>{t.shortcuts}</h3>
@@ -858,6 +1119,12 @@ export function App() {
                 onChange={(event) => setZoomLevel(Number(event.target.value))}
               />
               <span>{zoom}%</span>
+            </div>
+            <div className="settings-section about-section">
+              <h3>{t.about}</h3>
+              <p>{appInfo.name} {t.version} {appInfo.version}</p>
+              <button className="settings-secondary" onClick={() => void window.easyMD.openExternal(appInfo.repository)}>GitHub</button>
+              <button className="settings-secondary" onClick={() => void checkUpdates(true)}>{t.updateNow}</button>
             </div>
           </section>
         </div>
