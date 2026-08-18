@@ -41,6 +41,27 @@ button { color: inherit; border: 0; background: transparent; cursor: pointer; }
   background: transparent;
 }
 
+.hide-scrollbars * {
+  scrollbar-width: none;
+}
+
+.hide-scrollbars *::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.hide-scrollbars .source-wrap,
+.hide-scrollbars .preview-pane,
+.hide-scrollbars .file-list,
+.hide-scrollbars .outline-list,
+.hide-scrollbars .md-code-block pre {
+  box-shadow: inset -1px 0 0 rgba(125, 211, 252, .22);
+}
+
+.hide-scrollbars .document-grid.mode-split .source-wrap {
+  box-shadow: inset -1px 0 0 rgba(125, 211, 252, .24);
+}
+
 .app {
   --top: #191a1d;
   --title: #211921;

@@ -17,6 +17,7 @@ import {
   PanelLeftOpen,
   Quote,
   Save,
+  ScrollText,
   Scissors,
   SplitSquareHorizontal,
   Trash2
@@ -103,6 +104,7 @@ export function App() {
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [sourceLineNumbers, setSourceLineNumbers] = useState(true);
   const [codeLineNumbers, setCodeLineNumbers] = useState(false);
+  const [showScrollbars, setShowScrollbars] = useState(true);
   const editorRef = useRef<HTMLTextAreaElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   const sourceLinesRef = useRef<HTMLDivElement>(null);
@@ -242,7 +244,7 @@ export function App() {
   }, []);
 
   return (
-    <div className={`app theme-${theme}`} onContextMenu={showContextMenu}>
+    <div className={`app theme-${theme} ${showScrollbars ? "" : "hide-scrollbars"}`} onContextMenu={showContextMenu}>
       <div className="title-strip">
         <img src="./icon.svg" alt="EasyMD" />
         <span>EasyMD</span>
@@ -304,6 +306,7 @@ export function App() {
               ))}
             </div>
             <div className="tool-group mode-group">
+              <button className={showScrollbars ? "active" : ""} title="显示滚动条" onClick={() => setShowScrollbars((value) => !value)}><ScrollText size={16} /></button>
               <button className={sourceLineNumbers ? "active" : ""} title="源码行号" onClick={() => setSourceLineNumbers((value) => !value)}><ListOrdered size={16} /></button>
               <button className={codeLineNumbers ? "active" : ""} title="代码块行号" onClick={() => setCodeLineNumbers((value) => !value)}><Code2 size={16} /></button>
               <button className={viewMode === "source" ? "active" : ""} title={zh.source} onClick={() => setViewMode("source")}><FileCode2 size={16} /></button>
