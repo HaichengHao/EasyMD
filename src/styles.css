@@ -11,6 +11,36 @@ html, body, #root { width: 100%; height: 100%; margin: 0; overflow: hidden; }
 button, textarea { font: inherit; }
 button { color: inherit; border: 0; background: transparent; cursor: pointer; }
 
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #7dd3fc rgba(15, 23, 42, .18);
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, .16);
+}
+
+*::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, #60a5fa, #a78bfa 48%, #2dd4bf) border-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background:
+    linear-gradient(180deg, #93c5fd, #c4b5fd 48%, #5eead4) border-box;
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 .app {
   --top: #191a1d;
   --title: #211921;
