@@ -261,13 +261,13 @@ button { color: inherit; border: 0; background: transparent; cursor: pointer; }
   overflow: auto;
 }
 .source-wrap {
-  display: grid;
-  grid-template-columns: 0 minmax(0, 1fr);
+  display: block;
   overflow: hidden;
   background: var(--paper);
   border-right: 1px solid var(--line);
 }
 .source-wrap.with-line-numbers {
+  display: grid;
   grid-template-columns: 58px minmax(0, 1fr);
 }
 .source-line-numbers {
