@@ -7,13 +7,18 @@ EasyMD is a lightweight cross-platform desktop Markdown editor inspired by Typor
 - Markdown source, preview, and split editing modes
 - Live preview with scroll sync
 - LaTeX rendering with KaTeX
+- Mermaid diagram rendering
 - Syntax highlighted code blocks
+- Code fence language completion
 - File and outline sidebar
 - Typora-style context menu
 - Local file open/save support
+- PDF export
 - Theme presets
 - Custom themes from the local `themes/` folder
 - Customizable keyboard shortcuts
+- Built-in English and Simplified Chinese UI
+- In-app notifications and unsaved-change confirmation
 - Draggable split-view divider
 
 ## Run Locally
@@ -63,6 +68,34 @@ See the full guide: `docs/custom-themes.md`.
 EasyMD ships with common defaults such as `Ctrl+S` for save, `Ctrl+O` for open, `Ctrl+B` for bold, and `Ctrl + mouse wheel` for editor zoom.
 
 Open Settings from the toolbar, or press `Ctrl+,`, to customize shortcuts when they conflict with system or app-level shortcuts on your computer.
+
+## Language
+
+EasyMD supports Simplified Chinese and English in the interface. Open Settings and use the language selector to switch the UI language.
+
+When adding new user-facing text, keep the text in the `zh` and `en` dictionaries in `src/App.tsx` so the app does not mix languages.
+
+## Markdown Support
+
+EasyMD supports common Markdown features, including headings, lists, task lists, blockquotes, links, code blocks, LaTeX, and Mermaid diagrams.
+
+Mermaid example:
+
+````markdown
+```mermaid
+sequenceDiagram
+    participant User as User
+    participant EasyMD as EasyMD
+    participant Mermaid as Mermaid
+
+    User->>EasyMD: Write Markdown
+    EasyMD->>Mermaid: Render diagram source
+    Mermaid-->>EasyMD: Return SVG
+    EasyMD-->>User: Show diagram in preview
+```
+````
+
+PDF export is available from the toolbar or the File menu. EasyMD shows an in-app notification when the export succeeds, is cancelled, or fails.
 
 ## Package
 

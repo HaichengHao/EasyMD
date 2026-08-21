@@ -628,6 +628,158 @@ button { color: inherit; border: 0; background: transparent; cursor: pointer; }
   background: rgba(148, 163, 184, .24);
 }
 
+.toast-stack {
+  position: fixed;
+  right: 18px;
+  bottom: 38px;
+  z-index: 78;
+  display: grid;
+  gap: 8px;
+  width: min(430px, calc(100vw - 36px));
+  pointer-events: none;
+}
+.update-toast + .toast-stack {
+  bottom: 104px;
+}
+.app-toast {
+  pointer-events: auto;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 10px 12px 12px;
+  color: var(--text);
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--brand), transparent 42%) 0 4px, transparent 4px),
+    color-mix(in srgb, var(--paper), #020617 14%);
+  border: 1px solid color-mix(in srgb, var(--line), var(--brand) 42%);
+  border-radius: 7px;
+  box-shadow: 0 18px 46px rgba(0, 0, 0, .42);
+}
+.app-toast svg {
+  color: var(--brand);
+}
+.app-toast.toast-warning svg {
+  color: #facc15;
+}
+.app-toast.toast-error svg {
+  color: #fb7185;
+}
+.app-toast.toast-success {
+  border-color: color-mix(in srgb, var(--brand), var(--line) 22%);
+  box-shadow: 0 18px 48px color-mix(in srgb, var(--brand), transparent 78%);
+}
+.app-toast div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.app-toast strong,
+.app-toast span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.app-toast strong {
+  font-size: 14px;
+}
+.app-toast span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.app-toast button {
+  width: 26px;
+  height: 26px;
+  border-radius: 5px;
+  color: var(--muted);
+  background: transparent;
+}
+.app-toast button:hover {
+  color: var(--text);
+  background: rgba(148, 163, 184, .16);
+}
+
+.confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(2, 6, 23, .42);
+  backdrop-filter: blur(2px);
+}
+.confirm-panel {
+  width: min(430px, calc(100vw - 36px));
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  padding: 16px;
+  color: var(--text);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--brand), transparent 84%), transparent 46%),
+    color-mix(in srgb, var(--paper), #020617 10%);
+  border: 1px solid color-mix(in srgb, var(--brand), var(--line) 42%);
+  border-radius: 8px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, .42);
+}
+.confirm-icon {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  color: #facc15;
+  background: rgba(250, 204, 21, .12);
+  border: 1px solid rgba(250, 204, 21, .24);
+  border-radius: 8px;
+}
+.confirm-copy {
+  min-width: 0;
+}
+.confirm-copy h2 {
+  margin: 0 0 7px;
+  font-size: 18px;
+}
+.confirm-copy p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.65;
+}
+.confirm-actions {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding-top: 6px;
+}
+.confirm-actions button {
+  min-width: 0;
+  height: 34px;
+  padding: 0 13px;
+  border-radius: 6px;
+  color: var(--text);
+  background: rgba(148, 163, 184, .13);
+  border: 1px solid color-mix(in srgb, var(--line), var(--brand) 18%);
+  font: inherit;
+  font-weight: 700;
+}
+.confirm-actions button:hover {
+  background: rgba(148, 163, 184, .23);
+}
+.confirm-actions .primary {
+  color: var(--text);
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--brand), transparent 68%), color-mix(in srgb, var(--accent), transparent 78%)),
+    rgba(148, 163, 184, .14);
+  border-color: color-mix(in srgb, var(--brand), var(--line) 24%);
+  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--brand), var(--accent) 45%);
+}
+.confirm-actions .primary:hover {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--brand), transparent 56%), color-mix(in srgb, var(--accent), transparent 70%)),
+    rgba(148, 163, 184, .18);
+}
+
 .settings-backdrop {
   position: fixed;
   inset: 0;
@@ -876,6 +1028,29 @@ button { color: inherit; border: 0; background: transparent; cursor: pointer; }
   display: inline-block;
   padding: 0 !important;
 }
+.md-mermaid-block {
+  width: min(760px, 100%);
+}
+.md-mermaid-block .mermaid-source {
+  display: none;
+}
+.md-mermaid-block .mermaid-render {
+  min-height: 0;
+  padding: 12px 14px;
+  overflow: auto;
+  line-height: 1.35;
+}
+.md-mermaid-block .mermaid-render svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+}
+.md-mermaid-block.mermaid-error .mermaid-render {
+  color: #fecaca;
+  white-space: pre-wrap;
+  font: 12px/1.45 "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+}
 .md-code-block code .code-line {
   display: grid;
   grid-template-columns: 26px minmax(0, 1fr);
@@ -897,6 +1072,7 @@ button { color: inherit; border: 0; background: transparent; cursor: pointer; }
   white-space: pre;
 }
 .lang-python figcaption span::after { background: linear-gradient(90deg, #60a5fa, #facc15); }
+.lang-mermaid figcaption span::after { background: linear-gradient(90deg, #2dd4bf, #a78bfa, #f472b6); }
 .lang-java figcaption span::after { background: linear-gradient(90deg, #f97316, #38bdf8); }
 .lang-javascript figcaption span::after, .lang-js figcaption span::after { background: linear-gradient(90deg, #facc15, #22c55e); }
 .lang-typescript figcaption span::after, .lang-ts figcaption span::after { background: linear-gradient(90deg, #38bdf8, #2563eb); }
@@ -907,3 +1083,46 @@ button { color: inherit; border: 0; background: transparent; cursor: pointer; }
 .task-list-item { list-style: none; }
 .task-list-item input { margin-right: 8px; }
 .katex-display { overflow-x: auto; overflow-y: hidden; }
+
+@media print {
+  html, body, #root {
+    height: auto;
+    overflow: visible;
+    background: #fff;
+  }
+
+  .app {
+    display: block;
+    height: auto;
+    color: #111827;
+    background: #fff;
+  }
+
+  .sidebar,
+  .tool-row,
+  .source-wrap,
+  .split-resizer,
+  .status-bar,
+  .context-menu,
+  .find-panel,
+  .settings-backdrop,
+  .update-toast {
+    display: none !important;
+  }
+
+  .workspace,
+  .editor-shell,
+  .document-grid,
+  .preview-pane {
+    display: block !important;
+    width: auto !important;
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+
+  .preview-pane {
+    padding: 0 !important;
+    color: #111827 !important;
+  }
+}

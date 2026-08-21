@@ -143,23 +143,8 @@ function createWindow() {
 
   win.on("close", (event) => {
     if (!documentDirty) return;
-    const choice = dialog.showMessageBoxSync(win, {
-      type: "warning",
-      buttons: [t("\u53d6\u6d88"), t("\u4e0d\u4fdd\u5b58"), t("\u4fdd\u5b58")],
-      defaultId: 2,
-      cancelId: 0,
-      title: "EasyMD",
-      message: t("\u6587\u6863\u8fd8\u6ca1\u6709\u4fdd\u5b58"),
-      detail: t("\u5173\u95ed\u524d\u8981\u4fdd\u5b58\u5f53\u524d Markdown \u6587\u6863\u5417\uff1f")
-    });
-    if (choice === 0) {
-      event.preventDefault();
-      return;
-    }
-    if (choice === 2) {
-      event.preventDefault();
-      send("menu:save-then-close");
-    }
+    event.preventDefault();
+    send("app:request-close");
   });
 
   const rebuildMenu = async () => {
@@ -172,6 +157,7 @@ function createWindow() {
         { label: t("\u6253\u5f00..."), accelerator: "CmdOrCtrl+O", click: () => send("menu:open") },
         { label: t("\u4fdd\u5b58"), accelerator: "CmdOrCtrl+S", click: () => send("menu:save") },
         { label: t("\u53e6\u5b58\u4e3a..."), accelerator: "CmdOrCtrl+Shift+S", click: () => send("menu:save-as") },
+        { label: t("\u5bfc\u51fa PDF..."), accelerator: "CmdOrCtrl+Shift+E", click: () => send("menu:export-pdf") },
         { type: "separator" },
         { role: "quit", label: t("\u9000\u51fa") }
       ]
@@ -258,16 +244,7 @@ function createWindow() {
       submenu: [
         { label: t("\u68c0\u67e5\u66f4\u65b0"), click: () => send("menu:check-updates") },
         { label: "GitHub", click: () => shell.openExternal(repositoryUrl) },
-        {
-          label: t("\u5173\u4e8e EasyMD"),
-          click: () => dialog.showMessageBox(win, {
-            type: "info",
-            title: "EasyMD",
-            message: `EasyMD ${app.getVersion()}`,
-            detail: `${t("\u8f7b\u91cf\u7ea7 Markdown \u684c\u9762\u7f16\u8f91\u5668")}\n${repositoryUrl}`,
-            buttons: [t("\u786e\u5b9a")]
-          })
-        }
+        { label: t("\u5173\u4e8e EasyMD"), click: () => send("menu:about") }
       ]
     }
   ];
@@ -315,6 +292,22 @@ ipcMain.handle("file:save", async (_event, payload: { filePath?: string; content
 });
 
 ipcMain.handle("file:recent", () => getRecentFiles());
+ipcMain.handle("file:export-pdf", async (event, defaultName?: string) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win) return null;
+  const result = await dialog.showSaveDialog(win, {
+    defaultPath: `${defaultName?.replace(/\.md$/i, "") || "EasyMD"}.pdf`,
+    filters: [{ name: "PDF", extensions: ["pdf"] }]
+  });
+  if (result.canceled || !result.filePath) return null;
+  const pdf = await win.webContents.printToPDF({
+    printBackground: true,
+    pageSize: "A4",
+    margins: { marginType: "default" }
+  });
+  await fs.writeFile(result.filePath, pdf);
+  return { filePath: result.filePath };
+});
 ipcMain.handle("theme:list", () => readUserThemes());
 ipcMain.handle("theme:refresh-menu", () => {
   refreshApplicationMenu?.();

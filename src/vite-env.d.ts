@@ -24,6 +24,7 @@ interface Window {
   easyMD: {
     openFile: () => Promise<EasyMDFileResult | null>;
     saveFile: (payload: { filePath?: string; content: string }) => Promise<EasyMDFileResult | null>;
+    exportPdf: (defaultName?: string) => Promise<{ filePath: string } | null>;
     recentFiles: () => Promise<string[]>;
     listThemes: () => Promise<EasyMDUserTheme[]>;
     refreshThemeMenu: () => Promise<void>;

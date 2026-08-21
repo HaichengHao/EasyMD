@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { markdown as markdownLanguage } from "@codemirror/lang-markdown";
+import { autocompletion, CompletionContext, startCompletion } from "@codemirror/autocomplete";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { history, redo, undo } from "@codemirror/commands";
 import { Compartment, EditorState } from "@codemirror/state";
@@ -8,12 +9,15 @@ import { EditorView, lineNumbers } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
 import {
   AlignLeft,
+  AlertTriangle,
   Bold,
   ChevronDown,
+  CheckCircle2,
   CheckSquare,
   Clipboard,
   Code2,
   Copy,
+  Download,
   Eye,
   FileCode2,
   FileText,
@@ -21,6 +25,7 @@ import {
   Link,
   List,
   ListOrdered,
+  Info,
   PanelLeftClose,
   PanelLeftOpen,
   Quote,
@@ -41,6 +46,24 @@ type BuiltInThemeName = "night" | "github" | "newsprint" | "pixyll" | "whitey" |
 type ThemeName = BuiltInThemeName | "custom" | `user:${string}`;
 type ShortcutAction = "save" | "open" | "newFile" | "undo" | "redo" | "bold" | "italic" | "link" | "codeBlock" | "source" | "preview" | "split" | "toggleSidebar" | "settings" | "find" | "replace";
 type Language = "zh-CN" | "en-US";
+type ToastTone = "success" | "warning" | "error" | "info";
+
+interface ToastState {
+  id: number;
+  title: string;
+  detail?: string;
+  tone: ToastTone;
+}
+
+interface ConfirmState {
+  title: string;
+  detail: string;
+  primary: string;
+  secondary?: string;
+  cancel: string;
+  onPrimary: () => void;
+  onSecondary?: () => void;
+}
 
 interface ContextMenuState {
   x: number;
@@ -110,8 +133,23 @@ const zh = {
   showScrollbars: "\u663e\u793a\u6eda\u52a8\u6761",
   sourceLineNumbers: "\u6e90\u7801\u884c\u53f7",
   codeLineNumbers: "\u4ee3\u7801\u5757\u884c\u53f7",
+  exportPdf: "\u5bfc\u51fa PDF",
+  exportPdfDone: "PDF \u5df2\u5bfc\u51fa",
+  exportPdfCancelled: "\u5df2\u53d6\u6d88 PDF \u5bfc\u51fa",
+  exportPdfFailed: "PDF \u5bfc\u51fa\u5931\u8d25",
+  fileOpened: "\u6587\u4ef6\u5df2\u6253\u5f00",
+  fileSaved: "\u6587\u6863\u5df2\u4fdd\u5b58",
+  themeImported: "\u4e3b\u9898\u5df2\u5bfc\u5165",
+  themesRefreshed: "\u4e3b\u9898\u5217\u8868\u5df2\u5237\u65b0",
+  aboutTitle: "\u5173\u4e8e EasyMD",
+  currentVersion: "\u5f53\u524d\u7248\u672c",
+  noUpdate: "\u5df2\u662f\u6700\u65b0\u7248\u672c",
+  unsavedTitle: "\u6587\u6863\u8fd8\u6ca1\u6709\u4fdd\u5b58",
+  unsavedDetail: "\u5173\u95ed\u524d\u8981\u4fdd\u5b58\u5f53\u524d Markdown \u6587\u6863\u5417\uff1f",
+  dontSave: "\u4e0d\u4fdd\u5b58",
   resetShortcuts: "\u6062\u590d\u9ed8\u8ba4",
   close: "\u5173\u95ed",
+  cancel: "\u53d6\u6d88",
   zoom: "\u7f29\u653e",
   copied: "\u5df2\u590d\u5236",
   invalidTheme: "\u4e3b\u9898 CSS \u4e0d\u53ef\u7528\uff0c\u5df2\u5207\u56de Night\u3002"
@@ -180,12 +218,29 @@ const en: typeof zh = {
   showScrollbars: "Show Scrollbars",
   sourceLineNumbers: "Source Line Numbers",
   codeLineNumbers: "Code Block Line Numbers",
+  exportPdf: "Export PDF",
+  exportPdfDone: "PDF Exported",
+  exportPdfCancelled: "PDF export cancelled",
+  exportPdfFailed: "PDF export failed",
+  fileOpened: "File Opened",
+  fileSaved: "Document Saved",
+  themeImported: "Theme Imported",
+  themesRefreshed: "Theme List Refreshed",
+  aboutTitle: "About EasyMD",
+  currentVersion: "Current Version",
+  noUpdate: "EasyMD is up to date",
+  unsavedTitle: "Document has unsaved changes",
+  unsavedDetail: "Do you want to save the current Markdown document before closing?",
+  dontSave: "Don't Save",
   resetShortcuts: "Reset Defaults",
   close: "Close",
+  cancel: "Cancel",
   zoom: "Zoom",
   copied: "Copied",
   invalidTheme: "Theme CSS is invalid. EasyMD has switched back to Night."
 };
+
+const lightMermaidThemes: ThemeName[] = ["github", "newsprint", "pixyll", "whitey"];
 
 const themes: Array<{ value: BuiltInThemeName; label: string }> = [
   { value: "night", label: "Night" },
@@ -270,6 +325,56 @@ const toolbar: Array<{ command: FormatCommand; labelKey: keyof typeof zh; icon: 
   { command: "code", labelKey: "codeBlock", icon: <Code2 size={16} /> },
   { command: "link", labelKey: "link", icon: <Link size={16} /> }
 ];
+
+const codeLanguageCompletions = [
+  "mermaid",
+  "markdown",
+  "math",
+  "python",
+  "javascript",
+  "typescript",
+  "java",
+  "json",
+  "yaml",
+  "bash",
+  "shell",
+  "sql",
+  "html",
+  "css",
+  "dockerfile",
+  "makefile",
+  "toml",
+  "xml",
+  "rust",
+  "go",
+  "cpp",
+  "c",
+  "csharp",
+  "php",
+  "ruby",
+  "swift",
+  "kotlin"
+].map((label) => ({ label, type: label === "mermaid" ? "keyword" : "constant" }));
+
+function codeFenceLanguageCompletion(context: CompletionContext) {
+  const line = context.state.doc.lineAt(context.pos);
+  const before = line.text.slice(0, context.pos - line.from);
+  const match = before.match(/^\s*```([\w#+-]*)$/);
+  if (!match) return null;
+  const fenceStart = before.lastIndexOf("```");
+  return {
+    from: line.from + fenceStart + 3,
+    options: codeLanguageCompletions,
+    validFor: /^[\w#+-]*$/
+  };
+}
+
+function shouldStartCodeFenceCompletion(view: EditorView) {
+  const position = view.state.selection.main.head;
+  const line = view.state.doc.lineAt(position);
+  const before = line.text.slice(0, position - line.from);
+  return /^\s*```[\w#+-]*$/.test(before);
+}
 
 const defaultShortcuts: Record<ShortcutAction, string> = {
   save: "Ctrl+S",
@@ -384,6 +489,8 @@ export function App() {
   const [draggingSplit, setDraggingSplit] = useState(false);
   const [customThemeName, setCustomThemeName] = useState<string>();
   const [userThemes, setUserThemes] = useState<EasyMDUserTheme[]>([]);
+  const [toasts, setToasts] = useState<ToastState[]>([]);
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const customThemeInputRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
   const editorViewRef = useRef<EditorView | null>(null);
@@ -417,6 +524,18 @@ export function App() {
     "--split-left": `${splitRatio}%`
   } as CSSProperties;
 
+  function notify(title: string, detail?: string, tone: ToastTone = "info") {
+    const id = Date.now() + Math.random();
+    setToasts((items) => [...items.slice(-3), { id, title, detail, tone }]);
+    window.setTimeout(() => {
+      setToasts((items) => items.filter((item) => item.id !== id));
+    }, tone === "error" ? 5200 : 3400);
+  }
+
+  function dismissToast(id: number) {
+    setToasts((items) => items.filter((item) => item.id !== id));
+  }
+
   async function openFile() {
     const result = await window.easyMD.openFile();
     if (!result) return;
@@ -424,15 +543,54 @@ export function App() {
     setFilePath(result.filePath);
     setRecentFiles(result.recentFiles);
     setDirty(false);
+    notify(t.fileOpened, compactPath(result.filePath), "success");
   }
 
-  async function saveFile(forceSaveAs = false, closeAfterSave = false) {
+  async function saveFile(forceSaveAs = false, closeAfterSave = false, quiet = false) {
     const result = await window.easyMD.saveFile({ filePath: forceSaveAs ? undefined : filePath, content: markdown });
     if (!result) return;
     setFilePath(result.filePath);
     setRecentFiles(result.recentFiles);
     setDirty(false);
+    if (!quiet) notify(t.fileSaved, compactPath(result.filePath), "success");
     if (closeAfterSave) window.easyMD.closeAfterSave();
+  }
+
+  async function exportPdf() {
+    const previousMode = viewMode;
+    if (viewMode === "source") setViewMode("preview");
+    requestAnimationFrame(() => {
+      void window.easyMD.exportPdf(fileName(filePath))
+        .then((result) => {
+          if (result?.filePath) {
+            notify(t.exportPdfDone, compactPath(result.filePath), "success");
+          } else {
+            notify(t.exportPdfCancelled, undefined, "info");
+          }
+        })
+        .catch((error) => {
+          notify(t.exportPdfFailed, error instanceof Error ? error.message : String(error), "error");
+        })
+        .finally(() => {
+          if (previousMode === "source") setViewMode(previousMode);
+        });
+    });
+  }
+
+  function requestCloseDocument() {
+    if (!dirty) {
+      window.easyMD.closeAfterSave();
+      return;
+    }
+    setConfirmState({
+      title: t.unsavedTitle,
+      detail: t.unsavedDetail,
+      primary: t.save,
+      secondary: t.dontSave,
+      cancel: t.cancel,
+      onPrimary: () => void saveFile(false, true, true),
+      onSecondary: () => window.easyMD.closeAfterSave()
+    });
   }
 
   function newFile() {
@@ -604,7 +762,7 @@ export function App() {
       document.getElementById("directory-theme")?.remove();
       setTheme("night");
       localStorage.setItem("easymd.theme", "night");
-      window.alert(t.invalidTheme);
+      notify(t.invalidTheme, undefined, "warning");
     }
   }
 
@@ -616,7 +774,7 @@ export function App() {
       localStorage.removeItem("easymd.customThemeCss");
       localStorage.removeItem("easymd.customThemeName");
       localStorage.setItem("easymd.theme", "night");
-      window.alert(t.invalidTheme);
+      notify(t.invalidTheme, undefined, "warning");
       return;
     }
     document.getElementById("directory-theme")?.remove();
@@ -626,6 +784,7 @@ export function App() {
     localStorage.setItem("easymd.customThemeName", nextName);
     localStorage.setItem("easymd.theme", "custom");
     setTheme("custom");
+    notify(t.themeImported, nextName, "success");
   }
 
   async function importTheme(file?: File) {
@@ -639,6 +798,7 @@ export function App() {
     applyImportedTheme(themeFile.cssText, themeFile.name);
     await window.easyMD.refreshThemeMenu();
     await refreshUserThemes(themeFile.id as ThemeName);
+    notify(t.themesRefreshed, undefined, "success");
   }
 
   function chooseTheme(nextTheme: ThemeName) {
@@ -648,7 +808,7 @@ export function App() {
         document.getElementById("directory-theme")?.remove();
         setTheme("night");
         localStorage.setItem("easymd.theme", "night");
-        window.alert(t.invalidTheme);
+        notify(t.invalidTheme, undefined, "warning");
         return;
       }
       document.getElementById("custom-theme")?.remove();
@@ -708,7 +868,7 @@ export function App() {
         setUpdateInfo({ latestVersion: result.latestVersion, releaseUrl: result.releaseUrl });
       }
     } else if (showWhenCurrent) {
-      window.alert(`EasyMD ${result.currentVersion}`);
+      notify(t.noUpdate, `${t.currentVersion}: EasyMD ${result.currentVersion}`, "info");
     }
   }
 
@@ -807,8 +967,12 @@ export function App() {
       state: EditorState.create({
         doc: markdown,
         extensions: [
-          markdownLanguage(),
-          syntaxHighlighting(sourceHighlightStyle),
+            markdownLanguage(),
+            autocompletion({
+              activateOnTyping: true,
+              override: [codeFenceLanguageCompletion]
+            }),
+            syntaxHighlighting(sourceHighlightStyle),
           history(),
           lineNumberCompartment.of(sourceLineNumbers ? lineNumbers() : []),
           EditorView.lineWrapping,
@@ -817,12 +981,15 @@ export function App() {
               if (previewRef.current) syncScroll(view.scrollDOM, previewRef.current);
             }
           }),
-          EditorView.updateListener.of((update) => {
-            if (update.docChanged) {
-              setMarkdown(update.state.doc.toString());
-              setDirty(true);
-            }
-          })
+            EditorView.updateListener.of((update) => {
+              if (update.docChanged) {
+                setMarkdown(update.state.doc.toString());
+                setDirty(true);
+                if (shouldStartCodeFenceCompletion(update.view)) {
+                  startCompletion(update.view);
+                }
+              }
+            })
         ]
       })
     });
@@ -850,6 +1017,47 @@ export function App() {
   }, [sourceLineNumbers]);
 
   useEffect(() => {
+    const preview = previewRef.current;
+    if (!preview) return;
+    const blocks = Array.from(preview.querySelectorAll<HTMLElement>(".md-mermaid-block"));
+    if (!blocks.length) return;
+    let cancelled = false;
+    const mermaidTheme = lightMermaidThemes.includes(theme) ? "default" : "dark";
+
+    void import("mermaid").then(({ default: mermaid }) => {
+      if (cancelled) return;
+      mermaid.initialize({
+        startOnLoad: false,
+        securityLevel: "strict",
+        theme: mermaidTheme
+      });
+
+      blocks.forEach((block, index) => {
+        const source = block.querySelector<HTMLElement>(".mermaid-source")?.textContent || "";
+        const target = block.querySelector<HTMLElement>(".mermaid-render");
+        if (!target || !source.trim()) return;
+        const id = `easymd-mermaid-${Date.now()}-${index}`;
+        target.innerHTML = "";
+        mermaid.render(id, source)
+          .then(({ svg }) => {
+            if (cancelled) return;
+            target.innerHTML = svg;
+            block.classList.remove("mermaid-error");
+          })
+          .catch((error) => {
+            if (cancelled) return;
+            block.classList.add("mermaid-error");
+            target.textContent = error instanceof Error ? error.message : String(error);
+          });
+      });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [html, theme]);
+
+  useEffect(() => {
     window.easyMD.appInfo().then(setAppInfo).catch(() => undefined);
     void checkUpdates(false);
   }, []);
@@ -862,15 +1070,21 @@ export function App() {
       window.easyMD.onMenu("menu:save", () => void saveFile(false)),
       window.easyMD.onMenu("menu:save-then-close", () => void saveFile(false, true)),
       window.easyMD.onMenu("menu:save-as", () => void saveFile(true)),
+      window.easyMD.onMenu("menu:export-pdf", () => void exportPdf()),
       window.easyMD.onMenu("menu:view", (mode) => setViewMode(mode as ViewMode)),
       window.easyMD.onMenu("menu:theme", (name) => chooseTheme(name as ThemeName)),
-      window.easyMD.onMenu("menu:refresh-themes", () => void refreshUserThemes()),
+      window.easyMD.onMenu("menu:refresh-themes", () => void refreshUserThemes().then(() => notify(t.themesRefreshed, undefined, "success"))),
       window.easyMD.onMenu("menu:import-theme", () => void importThemeFromMenu()),
       window.easyMD.onMenu("menu:toggle-sidebar", () => setSidebarOpen((value) => !value)),
       window.easyMD.onMenu("menu:undo", runUndo),
       window.easyMD.onMenu("menu:redo", runRedo),
       window.easyMD.onMenu("menu:format", (command) => runFormat(command as FormatCommand)),
-      window.easyMD.onMenu("menu:check-updates", () => void checkUpdates(true))
+      window.easyMD.onMenu("menu:check-updates", () => void checkUpdates(true)),
+      window.easyMD.onMenu("menu:about", () => {
+        setSettingsOpen(true);
+        notify(t.aboutTitle, `${t.currentVersion}: ${appInfo.version}`, "info");
+      }),
+      window.easyMD.onMenu("app:request-close", requestCloseDocument)
     ];
     return () => off.forEach((dispose) => dispose());
   });
@@ -884,9 +1098,11 @@ export function App() {
     const onCopy = (event: MouseEvent) => {
       const button = (event.target as HTMLElement).closest("[data-copy-code]");
       if (!button) return;
-      const code = button.closest(".md-code-block")?.querySelector("code")?.textContent || "";
+      const block = button.closest(".md-code-block");
+      const code = block?.querySelector("code")?.textContent || block?.querySelector(".mermaid-source")?.textContent || "";
       void navigator.clipboard.writeText(code);
       button.textContent = t.copied;
+      notify(t.copied, undefined, "success");
       window.setTimeout(() => {
         button.textContent = t.copy;
       }, 1200);
@@ -966,6 +1182,7 @@ export function App() {
               <button className={viewMode === "split" ? "active" : ""} title={t.split} onClick={() => setViewMode("split")}><SplitSquareHorizontal size={16} /></button>
               <button className={findOpen ? "active" : ""} title={t.find} onClick={() => openFindPanel(false)}><Search size={16} /></button>
               <button className={settingsOpen ? "active" : ""} title={t.settings} onClick={() => setSettingsOpen(true)}><Settings size={16} /></button>
+              <button title={t.exportPdf} onClick={() => void exportPdf()}><Download size={16} /></button>
             </div>
             <input
               ref={customThemeInputRef}
@@ -1085,6 +1302,46 @@ export function App() {
             setUpdateInfo(null);
           }}>{t.later}</button>
         </section>
+      )}
+
+      <div className="toast-stack" aria-live="polite">
+        {toasts.map((toast) => (
+          <section key={toast.id} className={`app-toast toast-${toast.tone}`}>
+            {toast.tone === "success" ? <CheckCircle2 size={18} /> : toast.tone === "warning" || toast.tone === "error" ? <AlertTriangle size={18} /> : <Info size={18} />}
+            <div>
+              <strong>{toast.title}</strong>
+              {toast.detail && <span>{toast.detail}</span>}
+            </div>
+            <button onClick={() => dismissToast(toast.id)} title={t.close}><X size={14} /></button>
+          </section>
+        ))}
+      </div>
+
+      {confirmState && (
+        <div className="confirm-backdrop" onMouseDown={() => setConfirmState(null)}>
+          <section className="confirm-panel" onMouseDown={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+            <div className="confirm-icon"><AlertTriangle size={22} /></div>
+            <div className="confirm-copy">
+              <h2 id="confirm-title">{confirmState.title}</h2>
+              <p>{confirmState.detail}</p>
+            </div>
+            <div className="confirm-actions">
+              <button onClick={() => setConfirmState(null)}>{confirmState.cancel}</button>
+              {confirmState.secondary && confirmState.onSecondary && (
+                <button onClick={() => {
+                  const action = confirmState.onSecondary;
+                  setConfirmState(null);
+                  action?.();
+                }}>{confirmState.secondary}</button>
+              )}
+              <button className="primary" onClick={() => {
+                const action = confirmState.onPrimary;
+                setConfirmState(null);
+                action();
+              }}>{confirmState.primary}</button>
+            </div>
+          </section>
+        </div>
       )}
 
       {settingsOpen && (

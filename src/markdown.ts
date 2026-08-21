@@ -90,6 +90,15 @@ function trimCodeBlock(code: string) {
   return lines.join("\n");
 }
 
+function renderMermaidBlock(code: string) {
+  const compactCode = trimCodeBlock(code);
+  return `<figure class="md-code-block md-mermaid-block lang-mermaid" data-mermaid>
+      <pre class="mermaid-source">${escapeHtml(compactCode)}</pre>
+      <div class="mermaid-render" aria-live="polite"></div>
+      <figcaption><span>Mermaid</span><button type="button" data-copy-code>Copy</button></figcaption>
+    </figure>`;
+}
+
 const md = new MarkdownIt({
   html: false,
   linkify: true,
@@ -114,10 +123,18 @@ const md = new MarkdownIt({
   .use(markdownItKatex)
   .use(markdownItTaskLists, { enabled: true, label: true });
 
+const defaultFence = md.renderer.rules.fence;
+md.renderer.rules.fence = (tokens, index, options, env, self) => {
+  const token = tokens[index];
+  const lang = normalizeLang(token.info.split(/\s+/)[0] || "");
+  if (lang === "mermaid") return renderMermaidBlock(token.content);
+  return defaultFence ? defaultFence(tokens, index, options, env, self) : self.renderToken(tokens, index, options);
+};
+
 function addCodeLineNumbers(html: string) {
   const container = document.createElement("div");
   container.innerHTML = html;
-  container.querySelectorAll(".md-code-block code").forEach((code) => {
+  container.querySelectorAll(".md-code-block:not(.md-mermaid-block) code").forEach((code) => {
     const lines = code.innerHTML.split("\n");
     while (lines.length > 1 && !lines[0].trim()) lines.shift();
     while (lines.length > 1 && !lines[lines.length - 1].trim()) lines.pop();
@@ -128,9 +145,22 @@ function addCodeLineNumbers(html: string) {
   return container.innerHTML;
 }
 
+function normalizeMermaidBlocks(html: string) {
+  const container = document.createElement("div");
+  container.innerHTML = html;
+  container.querySelectorAll<HTMLElement>(".md-code-block").forEach((block) => {
+    const lang = block.dataset.lang || "";
+    const code = block.querySelector("code.language-mermaid, code.language-mmd");
+    if (lang !== "mermaid" && !code) return;
+    block.outerHTML = renderMermaidBlock(code?.textContent || "");
+  });
+  return container.innerHTML;
+}
+
 export function renderMarkdown(source: string, options: RenderOptions = {}) {
   const copyLabel = options.copyLabel || "Copy";
-  const html = md.render(source || "").replaceAll("data-copy-code>Copy</button>", `data-copy-code>${escapeHtml(copyLabel)}</button>`);
+  const html = normalizeMermaidBlocks(md.render(source || ""))
+    .replaceAll("data-copy-code>Copy</button>", `data-copy-code>${escapeHtml(copyLabel)}</button>`);
   return options.codeLineNumbers ? addCodeLineNumbers(html) : html;
 }
 
@@ -158,11 +188,26 @@ def hello(name: str) -> None:
 hello("EasyMD")
 \`\`\`
 
+## Mermaid
+
+\`\`\`mermaid
+sequenceDiagram
+    participant User as 用户
+    participant EasyMD as EasyMD
+    participant Mermaid as Mermaid
+
+    User->>EasyMD: 输入 Markdown
+    EasyMD->>Mermaid: 渲染图表源码
+    Mermaid-->>EasyMD: 返回 SVG
+    EasyMD-->>User: 在预览区显示图表
+\`\`\`
+
 ## 任务
 
 - [x] Electron 桌面壳
 - [x] Typora 风格侧边栏
 - [x] 漂亮代码块色条
-- [ ] 导出 PDF
+- [x] Mermaid 图表
+- [x] 导出 PDF
 `;
 }
