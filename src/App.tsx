@@ -21,6 +21,7 @@ import {
   Eye,
   FileCode2,
   FileText,
+  Image,
   Italic,
   Link,
   List,
@@ -95,6 +96,9 @@ const zh = {
   list: "\u5217\u8868",
   codeBlock: "\u4ee3\u7801\u5757",
   link: "\u94fe\u63a5",
+  image: "\u56fe\u7247",
+  insertImage: "\u63d2\u5165\u56fe\u7247",
+  imageAlt: "\u56fe\u7247\u8bf4\u660e",
   cut: "\u526a\u5207",
   copy: "\u590d\u5236",
   paste: "\u7c98\u8d34",
@@ -137,6 +141,7 @@ const zh = {
   exportPdfDone: "PDF \u5df2\u5bfc\u51fa",
   exportPdfCancelled: "\u5df2\u53d6\u6d88 PDF \u5bfc\u51fa",
   exportPdfFailed: "PDF \u5bfc\u51fa\u5931\u8d25",
+  imageLoadFailed: "\u56fe\u7247\u52a0\u8f7d\u5931\u8d25",
   fileOpened: "\u6587\u4ef6\u5df2\u6253\u5f00",
   fileSaved: "\u6587\u6863\u5df2\u4fdd\u5b58",
   themeImported: "\u4e3b\u9898\u5df2\u5bfc\u5165",
@@ -180,6 +185,9 @@ const en: typeof zh = {
   list: "List",
   codeBlock: "Code Block",
   link: "Link",
+  image: "Image",
+  insertImage: "Insert Image",
+  imageAlt: "Image description",
   cut: "Cut",
   copy: "Copy",
   paste: "Paste",
@@ -222,6 +230,7 @@ const en: typeof zh = {
   exportPdfDone: "PDF Exported",
   exportPdfCancelled: "PDF export cancelled",
   exportPdfFailed: "PDF export failed",
+  imageLoadFailed: "Image failed to load",
   fileOpened: "File Opened",
   fileSaved: "Document Saved",
   themeImported: "Theme Imported",
@@ -441,6 +450,37 @@ function compactPath(filePath?: string) {
   return `... / ${parts[parts.length - 2]} / ${parts[parts.length - 1]}`;
 }
 
+function pathDirname(value: string) {
+  const normalized = value.replace(/\\/g, "/");
+  const index = normalized.lastIndexOf("/");
+  return index >= 0 ? normalized.slice(0, index) : "";
+}
+
+function normalizePathForMarkdown(value: string) {
+  return value.replace(/\\/g, "/");
+}
+
+function relativeImagePath(fromFile: string | undefined, imagePath: string) {
+  if (!fromFile) return normalizePathForMarkdown(imagePath);
+  const baseParts = pathDirname(fromFile).replace(/\\/g, "/").split("/").filter(Boolean);
+  const imageParts = imagePath.replace(/\\/g, "/").split("/").filter(Boolean);
+  const baseRoot = baseParts[0]?.toLowerCase();
+  const imageRoot = imageParts[0]?.toLowerCase();
+  if (/^[a-z]:$/i.test(baseParts[0] || "") && baseRoot !== imageRoot) return normalizePathForMarkdown(imagePath);
+  let common = 0;
+  while (common < baseParts.length && common < imageParts.length && baseParts[common].toLowerCase() === imageParts[common].toLowerCase()) {
+    common += 1;
+  }
+  const up = Array(Math.max(0, baseParts.length - common)).fill("..");
+  const down = imageParts.slice(common);
+  const relative = [...up, ...down].join("/") || imageParts[imageParts.length - 1] || imagePath;
+  return relative.startsWith(".") ? relative : `./${relative}`;
+}
+
+function markdownImageSource(value: string) {
+  return /[\s()[\]<>]/.test(value) ? `<${value}>` : value;
+}
+
 function loadShortcuts() {
   try {
     const saved = JSON.parse(localStorage.getItem("easymd.shortcuts") || "{}") as Partial<Record<ShortcutAction, string>>;
@@ -499,7 +539,7 @@ export function App() {
   const syncing = useRef(false);
 
   const t = language === "zh-CN" ? zh : en;
-  const html = useMemo(() => renderMarkdown(markdown, { codeLineNumbers, copyLabel: t.copy }), [markdown, codeLineNumbers, t.copy]);
+  const html = useMemo(() => renderMarkdown(markdown, { codeLineNumbers, copyLabel: t.copy, basePath: filePath }), [markdown, codeLineNumbers, t.copy, filePath]);
   const outline = useMemo(() => getOutline(markdown), [markdown]);
   const words = useMemo(() => markdown.trim() ? markdown.trim().split(/\s+/).length : 0, [markdown]);
   const languageOptions = useMemo<Array<SelectOption<Language>>>(() => [
@@ -684,6 +724,13 @@ export function App() {
       editor.focus();
       editor.dispatch({ selection: { anchor: start + text.length } });
     });
+  }
+
+  async function insertImage() {
+    const imagePath = await window.easyMD.selectImage();
+    if (!imagePath) return;
+    const targetPath = markdownImageSource(relativeImagePath(filePath, imagePath));
+    insertRaw(`![${t.imageAlt}](${targetPath})`);
   }
 
   function syncScroll(from: HTMLElement, to: HTMLElement) {
@@ -1058,6 +1105,34 @@ export function App() {
   }, [html, theme]);
 
   useEffect(() => {
+    const preview = previewRef.current;
+    if (!preview) return;
+    let cancelled = false;
+    const images = Array.from(preview.querySelectorAll<HTMLImageElement>(".md-image[data-local-image]"));
+    images.forEach((image) => {
+      const localPath = image.dataset.localImage;
+      if (!localPath) return;
+      image.classList.remove("image-error");
+      image.title = image.title || localPath;
+      void window.easyMD.imageDataUrl(localPath)
+        .then((dataUrl) => {
+          if (cancelled || !dataUrl) return;
+          image.src = dataUrl;
+          image.removeAttribute("data-local-image");
+        })
+        .catch(() => {
+          if (cancelled) return;
+          image.classList.add("image-error");
+          image.alt = image.alt || t.imageLoadFailed;
+          image.title = `${t.imageLoadFailed}: ${localPath}`;
+        });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [html, t.imageLoadFailed]);
+
+  useEffect(() => {
     window.easyMD.appInfo().then(setAppInfo).catch(() => undefined);
     void checkUpdates(false);
   }, []);
@@ -1079,6 +1154,7 @@ export function App() {
       window.easyMD.onMenu("menu:undo", runUndo),
       window.easyMD.onMenu("menu:redo", runRedo),
       window.easyMD.onMenu("menu:format", (command) => runFormat(command as FormatCommand)),
+      window.easyMD.onMenu("menu:insert-image", () => void insertImage()),
       window.easyMD.onMenu("menu:check-updates", () => void checkUpdates(true)),
       window.easyMD.onMenu("menu:about", () => {
         setSettingsOpen(true);
@@ -1172,6 +1248,7 @@ export function App() {
               {toolbar.map((item) => (
                 <button title={t[item.labelKey]} key={item.command} onClick={() => runFormat(item.command)}>{item.icon}</button>
               ))}
+              <button title={t.insertImage} onClick={() => void insertImage()}><Image size={16} /></button>
             </div>
             <div className="tool-group mode-group">
               <button className={showScrollbars ? "active" : ""} title={t.showScrollbars} onClick={() => setShowScrollbars((value) => !value)}><ScrollText size={16} /></button>
@@ -1242,6 +1319,7 @@ export function App() {
             <button title={t.unorderedList} onClick={() => runFormat("list")}><List size={16} /></button>
             <button title={t.taskList} onClick={() => insertRaw("\n- [ ] task\n")}><CheckSquare size={16} /></button>
           </div>
+          <button className="context-row" onClick={() => void insertImage()}><Image size={16} />{t.insertImage}</button>
           <button className="context-row" onClick={() => runFormat("h1")}>{t.h1}</button>
           <button className="context-row" onClick={() => runFormat("h2")}>{t.h2}</button>
           <button className="context-row" onClick={() => insertRaw("\n$$\nE = mc^2\n$$\n")}>{t.formulaBlock}</button>

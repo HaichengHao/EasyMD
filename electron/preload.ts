@@ -3,6 +3,8 @@ import { contextBridge, ipcRenderer } from "electron";
 contextBridge.exposeInMainWorld("easyMD", {
   openFile: () => ipcRenderer.invoke("file:open"),
   saveFile: (payload: { filePath?: string; content: string }) => ipcRenderer.invoke("file:save", payload),
+  imageDataUrl: (filePath: string) => ipcRenderer.invoke("file:image-data-url", filePath),
+  selectImage: () => ipcRenderer.invoke("file:select-image"),
   exportPdf: (defaultName?: string) => ipcRenderer.invoke("file:export-pdf", defaultName),
   recentFiles: () => ipcRenderer.invoke("file:recent"),
   listThemes: () => ipcRenderer.invoke("theme:list"),

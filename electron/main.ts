@@ -7,6 +7,18 @@ let documentDirty = false;
 let refreshApplicationMenu: (() => void) | undefined;
 const repositoryUrl = "https://github.com/HaichengHao/EasyMD";
 const latestReleaseApi = "https://api.github.com/repos/HaichengHao/EasyMD/releases/latest";
+const imageMimeTypes: Record<string, string> = {
+  ".apng": "image/apng",
+  ".avif": "image/avif",
+  ".bmp": "image/bmp",
+  ".gif": "image/gif",
+  ".ico": "image/x-icon",
+  ".jpeg": "image/jpeg",
+  ".jpg": "image/jpeg",
+  ".png": "image/png",
+  ".svg": "image/svg+xml",
+  ".webp": "image/webp"
+};
 
 interface UserTheme {
   id: string;
@@ -190,6 +202,7 @@ function createWindow() {
         { label: t("\u659c\u4f53"), accelerator: "CmdOrCtrl+I", click: () => send("menu:format", "italic") },
         { label: t("\u5220\u9664\u7ebf"), accelerator: "Alt+Shift+5", click: () => send("menu:format", "strike") },
         { label: t("\u94fe\u63a5"), accelerator: "CmdOrCtrl+K", click: () => send("menu:format", "link") },
+        { label: t("\u63d2\u5165\u56fe\u7247..."), accelerator: "CmdOrCtrl+Shift+I", click: () => send("menu:insert-image") },
         { label: t("\u5185\u8054\u516c\u5f0f"), click: () => send("menu:format", "inlineMath") }
       ]
     },
@@ -292,6 +305,21 @@ ipcMain.handle("file:save", async (_event, payload: { filePath?: string; content
 });
 
 ipcMain.handle("file:recent", () => getRecentFiles());
+ipcMain.handle("file:image-data-url", async (_event, filePath: string) => {
+  const normalized = path.resolve(filePath);
+  const mime = imageMimeTypes[path.extname(normalized).toLowerCase()];
+  if (!mime) return null;
+  const buffer = await fs.readFile(normalized);
+  return `data:${mime};base64,${buffer.toString("base64")}`;
+});
+ipcMain.handle("file:select-image", async () => {
+  const result = await dialog.showOpenDialog({
+    properties: ["openFile"],
+    filters: [{ name: "Images", extensions: Object.keys(imageMimeTypes).map((ext) => ext.slice(1)) }]
+  });
+  if (result.canceled || !result.filePaths[0]) return null;
+  return result.filePaths[0];
+});
 ipcMain.handle("file:export-pdf", async (event, defaultName?: string) => {
   const win = BrowserWindow.fromWebContents(event.sender);
   if (!win) return null;

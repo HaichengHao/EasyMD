@@ -8,6 +8,7 @@ EasyMD is a lightweight cross-platform desktop Markdown editor inspired by Typor
 - Live preview with scroll sync
 - LaTeX rendering with KaTeX
 - Mermaid diagram rendering
+- Local and remote image preview with `![]()`
 - Syntax highlighted code blocks
 - Code fence language completion
 - File and outline sidebar
@@ -77,7 +78,16 @@ When adding new user-facing text, keep the text in the `zh` and `en` dictionarie
 
 ## Markdown Support
 
-EasyMD supports common Markdown features, including headings, lists, task lists, blockquotes, links, code blocks, LaTeX, and Mermaid diagrams.
+EasyMD supports common Markdown features, including headings, lists, task lists, blockquotes, links, images, code blocks, LaTeX, and Mermaid diagrams.
+
+Image example:
+
+```markdown
+![Local image](./images/demo.png)
+![Remote image](https://example.com/image.png)
+```
+
+Local relative image paths are resolved from the folder of the current Markdown file.
 
 Mermaid example:
 

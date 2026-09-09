@@ -899,6 +899,26 @@ button { color: inherit; border: 0; background: transparent; cursor: pointer; }
 .markdown-body p { margin: .9em 0; color: color-mix(in srgb, var(--text), var(--muted) 24%); }
 .markdown-body a { color: #7dd3fc; text-decoration: underline; text-underline-offset: 3px; }
 .theme-github .markdown-body a, .theme-whitey .markdown-body a, .theme-pixyll .markdown-body a, .theme-newsprint .markdown-body a { color: #0969da; }
+.markdown-body img.md-image {
+  display: block;
+  max-width: 100%;
+  max-height: min(72vh, 760px);
+  width: auto;
+  height: auto;
+  margin: 18px auto;
+  object-fit: contain;
+  border: 1px solid color-mix(in srgb, var(--line), var(--brand) 18%);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--paper), #020617 10%);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, .18);
+}
+.markdown-body img.md-image.image-error {
+  min-width: min(420px, 100%);
+  min-height: 92px;
+  padding: 18px;
+  color: #fecaca;
+  border-color: rgba(248, 113, 113, .45);
+}
 .markdown-body blockquote {
   margin: 18px 0;
   padding: 12px 16px;

@@ -15,6 +15,7 @@ export interface OutlineItem {
 export interface RenderOptions {
   codeLineNumbers?: boolean;
   copyLabel?: string;
+  basePath?: string;
 }
 
 function slugify(value: string) {
@@ -83,6 +84,67 @@ function normalizeLang(lang: string) {
   return (lang || "text").trim().toLowerCase().replace(/[^a-z0-9#+-]/g, "") || "text";
 }
 
+function isWebImageSource(src: string) {
+  return /^(https?:|data:|blob:|file:|#)/i.test(src);
+}
+
+function isWindowsAbsolutePath(src: string) {
+  return /^[a-zA-Z]:[\\/]/.test(src) || /^\\\\[^\\]+\\[^\\]+/.test(src);
+}
+
+function dirname(filePath: string) {
+  const normalized = filePath.replace(/\\/g, "/");
+  const index = normalized.lastIndexOf("/");
+  return index >= 0 ? normalized.slice(0, index) : "";
+}
+
+function normalizeLocalPath(value: string) {
+  const windowsPrefix = value.match(/^[a-zA-Z]:\//)?.[0] || "";
+  const rootPrefix = value.startsWith("/") ? "/" : windowsPrefix;
+  const source = windowsPrefix ? value.slice(windowsPrefix.length) : value.replace(/^\/+/, "");
+  const parts: string[] = [];
+  source.split("/").forEach((part) => {
+    if (!part || part === ".") return;
+    if (part === "..") {
+      parts.pop();
+      return;
+    }
+    parts.push(part);
+  });
+  return `${rootPrefix}${parts.join("/")}`.replace(/\/$/, "");
+}
+
+function resolveImagePath(src: string, basePath?: string) {
+  const trimmed = src.trim().replace(/^<|>$/g, "");
+  if (!trimmed || isWebImageSource(trimmed)) return null;
+  const normalizedSrc = trimmed.replace(/\\/g, "/");
+  if (isWindowsAbsolutePath(trimmed) || normalizedSrc.startsWith("/")) {
+    return normalizeLocalPath(normalizedSrc);
+  }
+  if (!basePath) return null;
+  const baseDir = dirname(basePath);
+  return normalizeLocalPath(`${baseDir}/${normalizedSrc}`);
+}
+
+function normalizeLooseImageSyntax(source: string) {
+  let inFence = false;
+  return source
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .map((line) => {
+      if (/^\s*(```|~~~)/.test(line)) inFence = !inFence;
+      if (inFence) return line;
+      return line.replace(/!\[([^\]]*)\]\(([^)\n]+)\)/g, (match, alt: string, rawSrc: string) => {
+        const src = rawSrc.trim();
+        if (!src || src.startsWith("<") || /^\w+:\/\//.test(src) || /^data:/i.test(src)) return match;
+        const normalizedSrc = src.replace(/\\/g, "/");
+        if (!/[\s\\]/.test(src)) return match;
+        return `![${alt}](<${normalizedSrc}>)`;
+      });
+    })
+    .join("\n");
+}
+
 function trimCodeBlock(code: string) {
   const lines = code.replace(/\r\n/g, "\n").split("\n");
   while (lines.length > 1 && !lines[0].trim()) lines.shift();
@@ -131,6 +193,19 @@ md.renderer.rules.fence = (tokens, index, options, env, self) => {
   return defaultFence ? defaultFence(tokens, index, options, env, self) : self.renderToken(tokens, index, options);
 };
 
+const defaultImage = md.renderer.rules.image;
+md.renderer.rules.image = (tokens, index, options, env, self) => {
+  const token = tokens[index];
+  const src = token.attrGet("src") || "";
+  const localPath = resolveImagePath(src, env?.basePath);
+  if (localPath) {
+    token.attrSet("data-local-image", localPath);
+    token.attrSet("loading", "lazy");
+  }
+  token.attrJoin("class", "md-image");
+  return defaultImage ? defaultImage(tokens, index, options, env, self) : self.renderToken(tokens, index, options);
+};
+
 function addCodeLineNumbers(html: string) {
   const container = document.createElement("div");
   container.innerHTML = html;
@@ -159,7 +234,7 @@ function normalizeMermaidBlocks(html: string) {
 
 export function renderMarkdown(source: string, options: RenderOptions = {}) {
   const copyLabel = options.copyLabel || "Copy";
-  const html = normalizeMermaidBlocks(md.render(source || ""))
+  const html = normalizeMermaidBlocks(md.render(normalizeLooseImageSyntax(source || ""), { basePath: options.basePath }))
     .replaceAll("data-copy-code>Copy</button>", `data-copy-code>${escapeHtml(copyLabel)}</button>`);
   return options.codeLineNumbers ? addCodeLineNumbers(html) : html;
 }
@@ -199,8 +274,19 @@ sequenceDiagram
     User->>EasyMD: 输入 Markdown
     EasyMD->>Mermaid: 渲染图表源码
     Mermaid-->>EasyMD: 返回 SVG
-    EasyMD-->>User: 在预览区显示图表
+EasyMD-->>User: 在预览区显示图表
 \`\`\`
+
+## 图片
+
+支持网络图片和本地图片预览：
+
+\`\`\`markdown
+![图片说明](./images/demo.png)
+![远程图片](https://example.com/image.png)
+\`\`\`
+
+本地相对路径会以当前 Markdown 文件所在目录为基准。
 
 ## 任务
 
@@ -208,6 +294,7 @@ sequenceDiagram
 - [x] Typora 风格侧边栏
 - [x] 漂亮代码块色条
 - [x] Mermaid 图表
+- [x] 图片预览
 - [x] 导出 PDF
 `;
 }
