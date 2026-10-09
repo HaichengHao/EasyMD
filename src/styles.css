@@ -852,11 +852,14 @@ button { color: inherit; border: 0; background: transparent; cursor: pointer; }
   position: fixed;
   right: 18px;
   bottom: 38px;
-  z-index: 78;
+  z-index: 120;
   display: grid;
   gap: 8px;
   width: min(430px, calc(100vw - 36px));
   pointer-events: none;
+}
+.app.ai-open .toast-stack {
+  right: min(412px, calc(100vw - 360px));
 }
 .update-toast + .toast-stack {
   bottom: 104px;
@@ -1136,6 +1139,14 @@ button { color: inherit; border: 0; background: transparent; cursor: pointer; }
 .settings-select .custom-select-menu {
   left: 0;
   right: auto;
+}
+.model-select {
+  width: 100%;
+}
+.model-select .custom-select-menu {
+  width: 100%;
+  max-height: 220px;
+  overflow: auto;
 }
 
 .markdown-body {

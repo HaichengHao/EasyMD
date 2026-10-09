@@ -635,6 +635,7 @@ export function App() {
     { value: "zh-CN", label: t.chinese },
     { value: "en-US", label: t.english }
   ], [t.chinese, t.english]);
+  const aiModelOptions = useMemo<Array<SelectOption<string>>>(() => aiModels.map((model) => ({ value: model, label: model })), [aiModels]);
   const findMatches = useMemo(() => {
     if (!findQuery) return [];
     const matches: Array<{ from: number; to: number }> = [];
@@ -1410,7 +1411,7 @@ export function App() {
   }, [t.copy, t.copied]);
 
   return (
-    <div className={`app ${themeClass} ${theme === "custom" ? "custom-theme" : ""} ${showScrollbars ? "" : "hide-scrollbars"}`} onContextMenu={showContextMenu}>
+    <div className={`app ${themeClass} ${theme === "custom" ? "custom-theme" : ""} ${showScrollbars ? "" : "hide-scrollbars"} ${aiOpen ? "ai-open" : ""}`} onContextMenu={showContextMenu}>
       <div className="workspace">
         <aside className={sidebarOpen ? "sidebar" : "sidebar collapsed"}>
           <button className="sidebar-toggle" onClick={() => setSidebarOpen((value) => !value)} title={sidebarOpen ? t.hideSidebar : t.showSidebar}>
@@ -1755,15 +1756,21 @@ export function App() {
               </label>
               <label className="settings-field">
                 <span>{t.aiModel}</span>
-                <input
-                  list="ai-model-options"
-                  value={aiModel}
-                  placeholder="gpt-4o-mini"
-                  onChange={(event) => saveAiSetting("model", event.target.value)}
-                />
-                <datalist id="ai-model-options">
-                  {aiModels.map((model) => <option value={model} key={model} />)}
-                </datalist>
+                {aiModelOptions.length ? (
+                  <CustomSelect
+                    title={t.aiModel}
+                    value={aiModelOptions.some((item) => item.value === aiModel) ? aiModel : aiModelOptions[0].value}
+                    options={aiModelOptions}
+                    onChange={(value) => saveAiSetting("model", value)}
+                    className="settings-select model-select"
+                  />
+                ) : (
+                  <input
+                    value={aiModel}
+                    placeholder="gpt-4o-mini"
+                    onChange={(event) => saveAiSetting("model", event.target.value)}
+                  />
+                )}
               </label>
               <div className="settings-actions">
                 <button className="settings-secondary" onClick={() => void fetchAiModels()} disabled={aiModelsBusy}>
