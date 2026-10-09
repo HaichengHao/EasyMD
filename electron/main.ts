@@ -90,6 +90,31 @@ function compareVersions(a: string, b: string) {
   return 0;
 }
 
+function fallbackAiModels(baseUrl: string) {
+  if (/minimax|minimaxi/i.test(baseUrl)) {
+    return ["MiniMax-M2", "MiniMax-Text-01"];
+  }
+  return [];
+}
+
+function extractAiModels(data: unknown) {
+  if (!data || typeof data !== "object") return [];
+  const root = data as {
+    data?: unknown;
+    models?: unknown;
+    model?: unknown;
+  };
+  const source = Array.isArray(root.data) ? root.data : Array.isArray(root.models) ? root.models : Array.isArray(root.model) ? root.model : [];
+  return source
+    .map((item) => {
+      if (typeof item === "string") return item;
+      if (!item || typeof item !== "object") return undefined;
+      const model = item as { id?: unknown; name?: unknown; model?: unknown };
+      return [model.id, model.name, model.model].find((value): value is string => typeof value === "string" && value.trim().length > 0);
+    })
+    .filter((item): item is string => Boolean(item));
+}
+
 function appInfo() {
   return {
     name: app.getName(),
@@ -421,22 +446,28 @@ ipcMain.handle("ai:list-models", async (_event, payload: AiProviderPayload) => {
     throw new Error("AI API key is missing.");
   }
   const baseUrl = (payload.baseUrl || "https://api.openai.com/v1").replace(/\/+$/, "");
-  const response = await fetch(`${baseUrl}/models`, {
-    headers: {
-      Accept: "application/json",
-      Authorization: `Bearer ${payload.apiKey.trim()}`
+  const fallback = fallbackAiModels(baseUrl);
+  try {
+    const response = await fetch(`${baseUrl}/models`, {
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${payload.apiKey.trim()}`
+      }
+    });
+    if (!response.ok) {
+      if (fallback.length) return { models: fallback, fallback: true };
+      const detail = await response.text().catch(() => "");
+      throw new Error(`Model request failed: ${response.status} ${response.statusText}${detail ? ` - ${detail.slice(0, 600)}` : ""}`);
     }
-  });
-  if (!response.ok) {
-    const detail = await response.text().catch(() => "");
-    throw new Error(`Model request failed: ${response.status} ${response.statusText}${detail ? ` - ${detail.slice(0, 600)}` : ""}`);
+    const data = await response.json();
+    const models = Array.from(new Set(extractAiModels(data))).sort((a, b) => a.localeCompare(b));
+    if (models.length) return { models, fallback: false };
+    if (fallback.length) return { models: fallback, fallback: true };
+    return { models: [], fallback: false };
+  } catch (error) {
+    if (fallback.length) return { models: fallback, fallback: true };
+    throw error;
   }
-  const data = await response.json() as { data?: Array<{ id?: string; name?: string }> };
-  const models = (data.data || [])
-    .map((item) => item.id || item.name)
-    .filter((item): item is string => Boolean(item))
-    .sort((a, b) => a.localeCompare(b));
-  return { models };
 });
 ipcMain.on("document:set-dirty", (_event, dirty: boolean) => {
   documentDirty = dirty;

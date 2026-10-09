@@ -178,6 +178,7 @@ const zh = {
   aiModel: "\u6a21\u578b",
   aiFetchModels: "\u83b7\u53d6\u6a21\u578b",
   aiModelsLoaded: "\u6a21\u578b\u5217\u8868\u5df2\u66f4\u65b0",
+  aiModelsFallback: "\u5df2\u4f7f\u7528\u5185\u7f6e\u6a21\u578b\u5019\u9009",
   aiModelsEmpty: "\u6ca1\u6709\u8bfb\u53d6\u5230\u53ef\u7528\u6a21\u578b",
   aiModelFetchFailed: "\u83b7\u53d6\u6a21\u578b\u5931\u8d25",
   aiAskPlaceholder: "\u8be2\u95ee\u5f53\u524d Markdown \u6587\u6863...",
@@ -293,6 +294,7 @@ const en: typeof zh = {
   aiModel: "Model",
   aiFetchModels: "Fetch Models",
   aiModelsLoaded: "Model list updated",
+  aiModelsFallback: "Using built-in model suggestions",
   aiModelsEmpty: "No available models were returned",
   aiModelFetchFailed: "Failed to fetch models",
   aiAskPlaceholder: "Ask about the current Markdown document...",
@@ -938,7 +940,7 @@ export function App() {
       setAiModels(models);
       localStorage.setItem("easymd.ai.models", JSON.stringify(models));
       if (!models.includes(aiModel)) saveAiSetting("model", models[0]);
-      notify(t.aiModelsLoaded, `${models.length}`, "success");
+      notify(result.fallback ? t.aiModelsFallback : t.aiModelsLoaded, models.join(", "), result.fallback ? "info" : "success");
     } catch (error) {
       notify(t.aiModelFetchFailed, error instanceof Error ? error.message : String(error), "error");
     } finally {
