@@ -27,6 +27,19 @@ interface UserTheme {
   cssText: string;
 }
 
+interface AiChatMessage {
+  role: "system" | "user" | "assistant";
+  content: string;
+}
+
+interface AiChatPayload {
+  apiKey: string;
+  baseUrl: string;
+  model: string;
+  messages: AiChatMessage[];
+  temperature?: number;
+}
+
 function t(value: string) {
   return value;
 }
@@ -366,6 +379,37 @@ ipcMain.handle("app:check-updates", () => checkForUpdates());
 ipcMain.handle("app:open-external", async (_event, url: string) => {
   if (!/^https:\/\/github\.com\/HaichengHao\/EasyMD(\/|$)/.test(url)) return;
   await shell.openExternal(url);
+});
+ipcMain.handle("ai:chat", async (_event, payload: AiChatPayload) => {
+  if (!payload.apiKey?.trim()) {
+    throw new Error("AI API key is missing.");
+  }
+  if (!payload.model?.trim()) {
+    throw new Error("AI model is missing.");
+  }
+  const baseUrl = (payload.baseUrl || "https://api.openai.com/v1").replace(/\/+$/, "");
+  const response = await fetch(`${baseUrl}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${payload.apiKey.trim()}`
+    },
+    body: JSON.stringify({
+      model: payload.model.trim(),
+      messages: payload.messages,
+      temperature: payload.temperature ?? 0.3
+    })
+  });
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    throw new Error(`AI request failed: ${response.status} ${response.statusText}${detail ? ` - ${detail.slice(0, 600)}` : ""}`);
+  }
+
+  const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
+  const content = data.choices?.[0]?.message?.content;
+  if (!content) throw new Error("AI response is empty.");
+  return { content };
 });
 ipcMain.on("document:set-dirty", (_event, dirty: boolean) => {
   documentDirty = dirty;

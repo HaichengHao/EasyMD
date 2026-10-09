@@ -13,6 +13,13 @@ contextBridge.exposeInMainWorld("easyMD", {
   appInfo: () => ipcRenderer.invoke("app:info"),
   checkForUpdates: () => ipcRenderer.invoke("app:check-updates"),
   openExternal: (url: string) => ipcRenderer.invoke("app:open-external", url),
+  aiChat: (payload: {
+    apiKey: string;
+    baseUrl: string;
+    model: string;
+    messages: Array<{ role: "system" | "user" | "assistant"; content: string }>;
+    temperature?: number;
+  }) => ipcRenderer.invoke("ai:chat", payload),
   setDirty: (dirty: boolean) => ipcRenderer.send("document:set-dirty", dirty),
   closeAfterSave: () => ipcRenderer.send("document:close-after-save"),
   onMenu: (channel: string, callback: (payload?: unknown) => void) => {

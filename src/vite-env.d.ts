@@ -34,6 +34,13 @@ interface Window {
     appInfo: () => Promise<{ name: string; version: string; repository: string }>;
     checkForUpdates: () => Promise<{ hasUpdate: boolean; currentVersion: string; latestVersion?: string; releaseUrl?: string }>;
     openExternal: (url: string) => Promise<void>;
+    aiChat: (payload: {
+      apiKey: string;
+      baseUrl: string;
+      model: string;
+      messages: Array<{ role: "system" | "user" | "assistant"; content: string }>;
+      temperature?: number;
+    }) => Promise<{ content: string }>;
     setDirty: (dirty: boolean) => void;
     closeAfterSave: () => void;
     onMenu: (channel: string, callback: (payload?: unknown) => void) => () => void;

@@ -15,6 +15,7 @@ EasyMD is a lightweight cross-platform desktop Markdown editor inspired by Typor
 - Typora-style context menu
 - Local file open/save support
 - PDF export
+- AI assistant with user-provided OpenAI-compatible API settings
 - Theme presets
 - Custom themes from the local `themes/` folder
 - Customizable keyboard shortcuts
@@ -75,6 +76,28 @@ Open Settings from the toolbar, or press `Ctrl+,`, to customize shortcuts when t
 EasyMD supports Simplified Chinese and English in the interface. Open Settings and use the language selector to switch the UI language.
 
 When adding new user-facing text, keep the text in the `zh` and `en` dictionaries in `src/App.tsx` so the app does not mix languages.
+
+## AI Assistant
+
+EasyMD 0.2 adds the first AI-assisted writing workflow. Open the AI panel from the toolbar, or press `Ctrl+Alt+A`.
+
+The assistant can:
+
+- Chat with the current Markdown document as context
+- Summarize selected text
+- Polish selected text while keeping Markdown structure
+- Translate selected text
+- Preview AI output before replacing or inserting it
+
+AI is disabled until the user provides their own API configuration in Settings:
+
+```text
+API Key:  your own provider key
+Base URL: https://api.openai.com/v1, or another OpenAI-compatible endpoint
+Model:    the model name supported by that endpoint
+```
+
+EasyMD does not include a built-in API key. The key is stored only in the local app storage on the user's computer. Document content is sent to the configured endpoint only when the user runs an AI action.
 
 ## Markdown Support
 

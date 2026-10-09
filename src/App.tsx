@@ -11,6 +11,7 @@ import {
   AlignLeft,
   AlertTriangle,
   Bold,
+  Bot,
   ChevronDown,
   CheckCircle2,
   CheckSquare,
@@ -33,10 +34,13 @@ import {
   Save,
   Search,
   ScrollText,
+  Send,
   Settings,
   Scissors,
+  Sparkles,
   SplitSquareHorizontal,
   Trash2,
+  Wand2,
   X
 } from "lucide-react";
 import { applyFormat, FormatCommand } from "./editorCommands";
@@ -45,9 +49,17 @@ import { demoMarkdown, getOutline, renderMarkdown } from "./markdown";
 type ViewMode = "source" | "preview" | "split";
 type BuiltInThemeName = "night" | "github" | "newsprint" | "pixyll" | "whitey" | "mypage-default" | "ink-graffiti";
 type ThemeName = BuiltInThemeName | "custom" | `user:${string}`;
-type ShortcutAction = "save" | "open" | "newFile" | "undo" | "redo" | "bold" | "italic" | "link" | "codeBlock" | "source" | "preview" | "split" | "toggleSidebar" | "settings" | "find" | "replace";
+type ShortcutAction = "save" | "open" | "newFile" | "undo" | "redo" | "bold" | "italic" | "link" | "codeBlock" | "source" | "preview" | "split" | "toggleSidebar" | "settings" | "find" | "replace" | "aiAssistant";
 type Language = "zh-CN" | "en-US";
 type ToastTone = "success" | "warning" | "error" | "info";
+type AiMessage = { role: "user" | "assistant"; content: string };
+type AiResultState = {
+  title: string;
+  content: string;
+  mode: "insert" | "replace";
+  from?: number;
+  to?: number;
+};
 
 interface ToastState {
   id: number;
@@ -157,7 +169,29 @@ const zh = {
   cancel: "\u53d6\u6d88",
   zoom: "\u7f29\u653e",
   copied: "\u5df2\u590d\u5236",
-  invalidTheme: "\u4e3b\u9898 CSS \u4e0d\u53ef\u7528\uff0c\u5df2\u5207\u56de Night\u3002"
+  invalidTheme: "\u4e3b\u9898 CSS \u4e0d\u53ef\u7528\uff0c\u5df2\u5207\u56de Night\u3002",
+  aiAssistant: "AI \u52a9\u624b",
+  openAiAssistant: "\u6253\u5f00 AI \u52a9\u624b",
+  aiSettings: "AI \u8bbe\u7f6e",
+  aiApiKey: "API Key",
+  aiBaseUrl: "Base URL",
+  aiModel: "\u6a21\u578b",
+  aiAskPlaceholder: "\u8be2\u95ee\u5f53\u524d Markdown \u6587\u6863...",
+  aiSend: "\u53d1\u9001",
+  aiNoApiKey: "\u8bf7\u5148\u5728\u8bbe\u7f6e\u91cc\u586b\u5199 AI API Key\u3002",
+  aiWorking: "AI \u6b63\u5728\u601d\u8003...",
+  aiFailed: "AI \u8bf7\u6c42\u5931\u8d25",
+  aiChatIntro: "\u6211\u53ef\u4ee5\u5e2e\u4f60\u603b\u7ed3\u3001\u6539\u5199\u3001\u7ffb\u8bd1\u6216\u68c0\u67e5\u5f53\u524d Markdown\u3002",
+  aiPrivacyHint: "API Key \u4ec5\u4fdd\u5b58\u5728\u672c\u673a localStorage\uff0c\u8bf7\u786e\u8ba4\u4f60\u4f7f\u7528\u7684\u63a5\u53e3\u4fe1\u4efb\u5f53\u524d\u6587\u6863\u5185\u5bb9\u3002",
+  aiSummarizeSelection: "AI \u603b\u7ed3\u9009\u4e2d",
+  aiPolishSelection: "AI \u6da6\u8272\u9009\u4e2d",
+  aiTranslateSelection: "AI \u7ffb\u8bd1\u9009\u4e2d",
+  aiNoSelection: "\u8bf7\u5148\u5728\u6e90\u7801\u533a\u9009\u4e2d\u8981\u5904\u7406\u7684\u6587\u672c\u3002",
+  aiResult: "AI \u7ed3\u679c",
+  aiReplaceSelection: "\u66ff\u6362\u9009\u4e2d",
+  aiInsertAtCursor: "\u63d2\u5165\u5230\u5149\u6807",
+  apply: "\u5e94\u7528",
+  discard: "\u4e22\u5f03"
 };
 
 const en: typeof zh = {
@@ -246,7 +280,29 @@ const en: typeof zh = {
   cancel: "Cancel",
   zoom: "Zoom",
   copied: "Copied",
-  invalidTheme: "Theme CSS is invalid. EasyMD has switched back to Night."
+  invalidTheme: "Theme CSS is invalid. EasyMD has switched back to Night.",
+  aiAssistant: "AI Assistant",
+  openAiAssistant: "Open AI Assistant",
+  aiSettings: "AI Settings",
+  aiApiKey: "API Key",
+  aiBaseUrl: "Base URL",
+  aiModel: "Model",
+  aiAskPlaceholder: "Ask about the current Markdown document...",
+  aiSend: "Send",
+  aiNoApiKey: "Add an AI API key in Settings first.",
+  aiWorking: "AI is thinking...",
+  aiFailed: "AI request failed",
+  aiChatIntro: "I can summarize, rewrite, translate, or review the current Markdown document.",
+  aiPrivacyHint: "The API key is stored only in localStorage. Make sure your endpoint is trusted before sending document content.",
+  aiSummarizeSelection: "AI Summarize Selection",
+  aiPolishSelection: "AI Polish Selection",
+  aiTranslateSelection: "AI Translate Selection",
+  aiNoSelection: "Select text in the source editor first.",
+  aiResult: "AI Result",
+  aiReplaceSelection: "Replace Selection",
+  aiInsertAtCursor: "Insert at Cursor",
+  apply: "Apply",
+  discard: "Discard"
 };
 
 const lightMermaidThemes: ThemeName[] = ["github", "newsprint", "pixyll", "whitey"];
@@ -401,7 +457,8 @@ const defaultShortcuts: Record<ShortcutAction, string> = {
   toggleSidebar: "Ctrl+Shift+L",
   settings: "Ctrl+,",
   find: "Ctrl+F",
-  replace: "Ctrl+H"
+  replace: "Ctrl+H",
+  aiAssistant: "Ctrl+Alt+A"
 };
 
 const shortcutLabelKeys: Record<ShortcutAction, keyof typeof zh> = {
@@ -420,7 +477,8 @@ const shortcutLabelKeys: Record<ShortcutAction, keyof typeof zh> = {
   toggleSidebar: "hideSidebar",
   settings: "settings",
   find: "find",
-  replace: "replace"
+  replace: "replace",
+  aiAssistant: "aiAssistant"
 };
 
 const sourceHighlightStyle = HighlightStyle.define([
@@ -481,6 +539,11 @@ function markdownImageSource(value: string) {
   return /[\s()[\]<>]/.test(value) ? `<${value}>` : value;
 }
 
+function truncateForAi(value: string, maxLength = 18000) {
+  if (value.length <= maxLength) return value;
+  return `${value.slice(0, maxLength)}\n\n...[truncated by EasyMD]`;
+}
+
 function loadShortcuts() {
   try {
     const saved = JSON.parse(localStorage.getItem("easymd.shortcuts") || "{}") as Partial<Record<ShortcutAction, string>>;
@@ -531,6 +594,14 @@ export function App() {
   const [userThemes, setUserThemes] = useState<EasyMDUserTheme[]>([]);
   const [toasts, setToasts] = useState<ToastState[]>([]);
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiApiKey, setAiApiKey] = useState(() => localStorage.getItem("easymd.ai.apiKey") || "");
+  const [aiBaseUrl, setAiBaseUrl] = useState(() => localStorage.getItem("easymd.ai.baseUrl") || "https://api.openai.com/v1");
+  const [aiModel, setAiModel] = useState(() => localStorage.getItem("easymd.ai.model") || "gpt-4o-mini");
+  const [aiInput, setAiInput] = useState("");
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiMessages, setAiMessages] = useState<AiMessage[]>([]);
+  const [aiResult, setAiResult] = useState<AiResultState | null>(null);
   const customThemeInputRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
   const editorViewRef = useRef<EditorView | null>(null);
@@ -733,6 +804,108 @@ export function App() {
     insertRaw(`![${t.imageAlt}](${targetPath})`);
   }
 
+  function selectedTextRange() {
+    const editor = editorViewRef.current;
+    if (!editor) return null;
+    const selection = editor.state.selection.main;
+    if (selection.empty) return null;
+    return {
+      from: selection.from,
+      to: selection.to,
+      text: editor.state.sliceDoc(selection.from, selection.to)
+    };
+  }
+
+  async function callAi(messages: Array<{ role: "system" | "user" | "assistant"; content: string }>) {
+    if (!aiApiKey.trim()) {
+      setSettingsOpen(true);
+      notify(t.aiNoApiKey, undefined, "warning");
+      throw new Error(t.aiNoApiKey);
+    }
+    setAiBusy(true);
+    try {
+      const result = await window.easyMD.aiChat({
+        apiKey: aiApiKey,
+        baseUrl: aiBaseUrl,
+        model: aiModel,
+        messages,
+        temperature: 0.3
+      });
+      return result.content.trim();
+    } finally {
+      setAiBusy(false);
+    }
+  }
+
+  async function runAiSelectionAction(action: "summarize" | "polish" | "translate") {
+    const range = selectedTextRange();
+    if (!range) {
+      notify(t.aiNoSelection, undefined, "warning");
+      return;
+    }
+    setContextMenu(null);
+    const instruction = {
+      summarize: language === "zh-CN" ? "\u7528\u7b80\u6d01\u7684 Markdown \u8981\u70b9\u603b\u7ed3\u9009\u4e2d\u5185\u5bb9\u3002" : "Summarize the selected content as concise Markdown bullet points.",
+      polish: language === "zh-CN" ? "\u5728\u4fdd\u7559 Markdown \u7ed3\u6784\u7684\u524d\u63d0\u4e0b\uff0c\u6da6\u8272\u9009\u4e2d\u5185\u5bb9\uff0c\u76f4\u63a5\u8fd4\u56de\u6539\u5199\u540e\u7684 Markdown\u3002" : "Polish the selected content while preserving Markdown structure. Return only the revised Markdown.",
+      translate: language === "zh-CN" ? "\u5c06\u9009\u4e2d\u5185\u5bb9\u7ffb\u8bd1\u4e3a\u7b80\u4f53\u4e2d\u6587\uff0c\u4fdd\u7559 Markdown \u7ed3\u6784\u3002" : "Translate the selected content into English while preserving Markdown structure."
+    }[action];
+    try {
+      const content = await callAi([
+        { role: "system", content: "You are EasyMD's writing assistant. Return Markdown only. Do not wrap the answer in code fences unless the user content requires code fences." },
+        { role: "user", content: `${instruction}\n\nSelected Markdown:\n\n${range.text}` }
+      ]);
+      setAiResult({
+        title: action === "summarize" ? t.aiSummarizeSelection : action === "polish" ? t.aiPolishSelection : t.aiTranslateSelection,
+        content,
+        mode: action === "summarize" ? "insert" : "replace",
+        from: range.from,
+        to: range.to
+      });
+    } catch (error) {
+      notify(t.aiFailed, error instanceof Error ? error.message : String(error), "error");
+    }
+  }
+
+  async function sendAiChat() {
+    const question = aiInput.trim();
+    if (!question || aiBusy) return;
+    const nextMessages: AiMessage[] = [...aiMessages, { role: "user", content: question }];
+    setAiMessages(nextMessages);
+    setAiInput("");
+    setAiOpen(true);
+    try {
+      const answer = await callAi([
+        { role: "system", content: "You are EasyMD's Markdown assistant. Answer in the user's UI language. Be concise, practical, and preserve Markdown syntax when proposing edits." },
+        { role: "user", content: `Current file: ${filePath || "Untitled.md"}\n\nCurrent Markdown document:\n\n${truncateForAi(markdown)}` },
+        ...nextMessages.map((message) => ({ role: message.role, content: message.content }))
+      ]);
+      setAiMessages((items) => [...items, { role: "assistant", content: answer }]);
+    } catch (error) {
+      notify(t.aiFailed, error instanceof Error ? error.message : String(error), "error");
+    }
+  }
+
+  function applyAiResult() {
+    if (!aiResult) return;
+    const editor = editorViewRef.current;
+    const from = aiResult.mode === "replace" && typeof aiResult.from === "number" ? aiResult.from : editor?.state.selection.main.from ?? markdown.length;
+    const to = aiResult.mode === "replace" && typeof aiResult.to === "number" ? aiResult.to : from;
+    setMarkdown(markdown.slice(0, from) + aiResult.content + markdown.slice(to));
+    setDirty(true);
+    setAiResult(null);
+    requestAnimationFrame(() => {
+      editor?.focus();
+      editor?.dispatch({ selection: { anchor: from + aiResult.content.length } });
+    });
+  }
+
+  function saveAiSetting(kind: "apiKey" | "baseUrl" | "model", value: string) {
+    if (kind === "apiKey") setAiApiKey(value);
+    if (kind === "baseUrl") setAiBaseUrl(value);
+    if (kind === "model") setAiModel(value);
+    localStorage.setItem(`easymd.ai.${kind}`, value);
+  }
+
   function syncScroll(from: HTMLElement, to: HTMLElement) {
     if (syncing.current) return;
     const fromMax = Math.max(1, from.scrollHeight - from.clientHeight);
@@ -905,6 +1078,7 @@ export function App() {
     if (action === "settings") setSettingsOpen(true);
     if (action === "find") openFindPanel(false);
     if (action === "replace") openFindPanel(true);
+    if (action === "aiAssistant") setAiOpen((value) => !value);
   }
 
   async function checkUpdates(showWhenCurrent = false) {
@@ -968,7 +1142,7 @@ export function App() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [shortcuts, markdown, filePath, viewMode, sidebarOpen]);
+  }, [shortcuts, markdown, filePath, viewMode, sidebarOpen, aiOpen]);
 
   useEffect(() => {
     const onWheel = (event: WheelEvent) => {
@@ -1257,6 +1431,7 @@ export function App() {
               <button className={viewMode === "source" ? "active" : ""} title={t.source} onClick={() => setViewMode("source")}><FileCode2 size={16} /></button>
               <button className={viewMode === "preview" ? "active" : ""} title={t.preview} onClick={() => setViewMode("preview")}><Eye size={16} /></button>
               <button className={viewMode === "split" ? "active" : ""} title={t.split} onClick={() => setViewMode("split")}><SplitSquareHorizontal size={16} /></button>
+              <button className={aiOpen ? "active" : ""} title={t.openAiAssistant} onClick={() => setAiOpen((value) => !value)}><Bot size={16} /></button>
               <button className={findOpen ? "active" : ""} title={t.find} onClick={() => openFindPanel(false)}><Search size={16} /></button>
               <button className={settingsOpen ? "active" : ""} title={t.settings} onClick={() => setSettingsOpen(true)}><Settings size={16} /></button>
               <button title={t.exportPdf} onClick={() => void exportPdf()}><Download size={16} /></button>
@@ -1320,6 +1495,11 @@ export function App() {
             <button title={t.taskList} onClick={() => insertRaw("\n- [ ] task\n")}><CheckSquare size={16} /></button>
           </div>
           <button className="context-row" onClick={() => void insertImage()}><Image size={16} />{t.insertImage}</button>
+          <div className="context-ai">
+            <button onClick={() => void runAiSelectionAction("summarize")}><Sparkles size={15} />{t.aiSummarizeSelection}</button>
+            <button onClick={() => void runAiSelectionAction("polish")}><Wand2 size={15} />{t.aiPolishSelection}</button>
+            <button onClick={() => void runAiSelectionAction("translate")}><Bot size={15} />{t.aiTranslateSelection}</button>
+          </div>
           <button className="context-row" onClick={() => runFormat("h1")}>{t.h1}</button>
           <button className="context-row" onClick={() => runFormat("h2")}>{t.h2}</button>
           <button className="context-row" onClick={() => insertRaw("\n$$\nE = mc^2\n$$\n")}>{t.formulaBlock}</button>
@@ -1366,6 +1546,58 @@ export function App() {
             </div>
           )}
         </section>
+      )}
+
+      {aiOpen && (
+        <aside className="ai-panel">
+          <header>
+            <div>
+              <strong>{t.aiAssistant}</strong>
+              <span>{aiModel}</span>
+            </div>
+            <button title={t.close} onClick={() => setAiOpen(false)}><X size={15} /></button>
+          </header>
+          <div className="ai-quick-actions">
+            <button onClick={() => void runAiSelectionAction("summarize")}><Sparkles size={15} />{t.aiSummarizeSelection}</button>
+            <button onClick={() => void runAiSelectionAction("polish")}><Wand2 size={15} />{t.aiPolishSelection}</button>
+            <button onClick={() => void runAiSelectionAction("translate")}><Bot size={15} />{t.aiTranslateSelection}</button>
+          </div>
+          <div className="ai-messages">
+            {!aiMessages.length && (
+              <div className="ai-empty">
+                <Bot size={22} />
+                <p>{t.aiChatIntro}</p>
+              </div>
+            )}
+            {aiMessages.map((message, index) => (
+              <article key={`${message.role}-${index}`} className={`ai-message ${message.role}`}>
+                <small>{message.role === "user" ? "You" : "EasyMD AI"}</small>
+                <p>{message.content}</p>
+                {message.role === "assistant" && (
+                  <button onClick={() => setAiResult({ title: t.aiResult, content: message.content, mode: "insert" })}>{t.aiInsertAtCursor}</button>
+                )}
+              </article>
+            ))}
+            {aiBusy && <div className="ai-thinking">{t.aiWorking}</div>}
+          </div>
+          <form className="ai-input-row" onSubmit={(event) => {
+            event.preventDefault();
+            void sendAiChat();
+          }}>
+            <textarea
+              value={aiInput}
+              placeholder={t.aiAskPlaceholder}
+              onChange={(event) => setAiInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  void sendAiChat();
+                }
+              }}
+            />
+            <button type="submit" disabled={aiBusy || !aiInput.trim()} title={t.aiSend}><Send size={16} /></button>
+          </form>
+        </aside>
       )}
 
       {updateInfo && (
@@ -1461,6 +1693,35 @@ export function App() {
               <button className="settings-secondary" onClick={resetShortcuts}>{t.resetShortcuts}</button>
             </div>
             <div className="settings-section">
+              <h3>{t.aiSettings}</h3>
+              <label className="settings-field">
+                <span>{t.aiApiKey}</span>
+                <input
+                  type="password"
+                  value={aiApiKey}
+                  placeholder="sk-..."
+                  onChange={(event) => saveAiSetting("apiKey", event.target.value)}
+                />
+              </label>
+              <label className="settings-field">
+                <span>{t.aiBaseUrl}</span>
+                <input
+                  value={aiBaseUrl}
+                  placeholder="https://api.openai.com/v1"
+                  onChange={(event) => saveAiSetting("baseUrl", event.target.value)}
+                />
+              </label>
+              <label className="settings-field">
+                <span>{t.aiModel}</span>
+                <input
+                  value={aiModel}
+                  placeholder="gpt-4o-mini"
+                  onChange={(event) => saveAiSetting("model", event.target.value)}
+                />
+              </label>
+              <p className="settings-hint">{t.aiPrivacyHint}</p>
+            </div>
+            <div className="settings-section">
               <h3>{t.zoom}</h3>
               <input
                 type="range"
@@ -1478,6 +1739,23 @@ export function App() {
               <button className="settings-secondary" onClick={() => void window.easyMD.openExternal(appInfo.repository)}>GitHub</button>
               <button className="settings-secondary" onClick={() => void checkUpdates(true)}>{t.updateNow}</button>
             </div>
+          </section>
+        </div>
+      )}
+
+      {aiResult && (
+        <div className="ai-result-backdrop" onMouseDown={() => setAiResult(null)}>
+          <section className="ai-result-panel" onMouseDown={(event) => event.stopPropagation()} role="dialog" aria-modal="true">
+            <header>
+              <strong>{aiResult.title}</strong>
+              <button title={t.close} onClick={() => setAiResult(null)}><X size={15} /></button>
+            </header>
+            <pre>{aiResult.content}</pre>
+            <footer>
+              <button onClick={() => void navigator.clipboard.writeText(aiResult.content).then(() => notify(t.copied, undefined, "success"))}>{t.copy}</button>
+              <button onClick={() => setAiResult(null)}>{t.discard}</button>
+              <button className="primary" onClick={applyAiResult}>{aiResult.mode === "replace" ? t.aiReplaceSelection : t.aiInsertAtCursor}</button>
+            </footer>
           </section>
         </div>
       )}
