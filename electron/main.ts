@@ -40,6 +40,11 @@ interface AiChatPayload {
   temperature?: number;
 }
 
+interface AiProviderPayload {
+  apiKey: string;
+  baseUrl: string;
+}
+
 function t(value: string) {
   return value;
 }
@@ -410,6 +415,28 @@ ipcMain.handle("ai:chat", async (_event, payload: AiChatPayload) => {
   const content = data.choices?.[0]?.message?.content;
   if (!content) throw new Error("AI response is empty.");
   return { content };
+});
+ipcMain.handle("ai:list-models", async (_event, payload: AiProviderPayload) => {
+  if (!payload.apiKey?.trim()) {
+    throw new Error("AI API key is missing.");
+  }
+  const baseUrl = (payload.baseUrl || "https://api.openai.com/v1").replace(/\/+$/, "");
+  const response = await fetch(`${baseUrl}/models`, {
+    headers: {
+      Accept: "application/json",
+      Authorization: `Bearer ${payload.apiKey.trim()}`
+    }
+  });
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    throw new Error(`Model request failed: ${response.status} ${response.statusText}${detail ? ` - ${detail.slice(0, 600)}` : ""}`);
+  }
+  const data = await response.json() as { data?: Array<{ id?: string; name?: string }> };
+  const models = (data.data || [])
+    .map((item) => item.id || item.name)
+    .filter((item): item is string => Boolean(item))
+    .sort((a, b) => a.localeCompare(b));
+  return { models };
 });
 ipcMain.on("document:set-dirty", (_event, dirty: boolean) => {
   documentDirty = dirty;

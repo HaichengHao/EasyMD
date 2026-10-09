@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld("easyMD", {
     messages: Array<{ role: "system" | "user" | "assistant"; content: string }>;
     temperature?: number;
   }) => ipcRenderer.invoke("ai:chat", payload),
+  aiListModels: (payload: { apiKey: string; baseUrl: string }) => ipcRenderer.invoke("ai:list-models", payload),
   setDirty: (dirty: boolean) => ipcRenderer.send("document:set-dirty", dirty),
   closeAfterSave: () => ipcRenderer.send("document:close-after-save"),
   onMenu: (channel: string, callback: (payload?: unknown) => void) => {

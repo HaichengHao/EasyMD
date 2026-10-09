@@ -176,6 +176,10 @@ const zh = {
   aiApiKey: "API Key",
   aiBaseUrl: "Base URL",
   aiModel: "\u6a21\u578b",
+  aiFetchModels: "\u83b7\u53d6\u6a21\u578b",
+  aiModelsLoaded: "\u6a21\u578b\u5217\u8868\u5df2\u66f4\u65b0",
+  aiModelsEmpty: "\u6ca1\u6709\u8bfb\u53d6\u5230\u53ef\u7528\u6a21\u578b",
+  aiModelFetchFailed: "\u83b7\u53d6\u6a21\u578b\u5931\u8d25",
   aiAskPlaceholder: "\u8be2\u95ee\u5f53\u524d Markdown \u6587\u6863...",
   aiSend: "\u53d1\u9001",
   aiNoApiKey: "\u8bf7\u5148\u5728\u8bbe\u7f6e\u91cc\u586b\u5199 AI API Key\u3002",
@@ -287,6 +291,10 @@ const en: typeof zh = {
   aiApiKey: "API Key",
   aiBaseUrl: "Base URL",
   aiModel: "Model",
+  aiFetchModels: "Fetch Models",
+  aiModelsLoaded: "Model list updated",
+  aiModelsEmpty: "No available models were returned",
+  aiModelFetchFailed: "Failed to fetch models",
   aiAskPlaceholder: "Ask about the current Markdown document...",
   aiSend: "Send",
   aiNoApiKey: "Add an AI API key in Settings first.",
@@ -598,8 +606,16 @@ export function App() {
   const [aiApiKey, setAiApiKey] = useState(() => localStorage.getItem("easymd.ai.apiKey") || "");
   const [aiBaseUrl, setAiBaseUrl] = useState(() => localStorage.getItem("easymd.ai.baseUrl") || "https://api.openai.com/v1");
   const [aiModel, setAiModel] = useState(() => localStorage.getItem("easymd.ai.model") || "gpt-4o-mini");
+  const [aiModels, setAiModels] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("easymd.ai.models") || "[]") as string[];
+    } catch {
+      return [];
+    }
+  });
   const [aiInput, setAiInput] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
+  const [aiModelsBusy, setAiModelsBusy] = useState(false);
   const [aiMessages, setAiMessages] = useState<AiMessage[]>([]);
   const [aiResult, setAiResult] = useState<AiResultState | null>(null);
   const customThemeInputRef = useRef<HTMLInputElement>(null);
@@ -904,6 +920,30 @@ export function App() {
     if (kind === "baseUrl") setAiBaseUrl(value);
     if (kind === "model") setAiModel(value);
     localStorage.setItem(`easymd.ai.${kind}`, value);
+  }
+
+  async function fetchAiModels() {
+    if (!aiApiKey.trim()) {
+      notify(t.aiNoApiKey, undefined, "warning");
+      return;
+    }
+    setAiModelsBusy(true);
+    try {
+      const result = await window.easyMD.aiListModels({ apiKey: aiApiKey, baseUrl: aiBaseUrl });
+      const models = Array.from(new Set(result.models)).filter(Boolean);
+      if (!models.length) {
+        notify(t.aiModelsEmpty, undefined, "warning");
+        return;
+      }
+      setAiModels(models);
+      localStorage.setItem("easymd.ai.models", JSON.stringify(models));
+      if (!models.includes(aiModel)) saveAiSetting("model", models[0]);
+      notify(t.aiModelsLoaded, `${models.length}`, "success");
+    } catch (error) {
+      notify(t.aiModelFetchFailed, error instanceof Error ? error.message : String(error), "error");
+    } finally {
+      setAiModelsBusy(false);
+    }
   }
 
   function syncScroll(from: HTMLElement, to: HTMLElement) {
@@ -1714,11 +1754,24 @@ export function App() {
               <label className="settings-field">
                 <span>{t.aiModel}</span>
                 <input
+                  list="ai-model-options"
                   value={aiModel}
                   placeholder="gpt-4o-mini"
                   onChange={(event) => saveAiSetting("model", event.target.value)}
                 />
+                <datalist id="ai-model-options">
+                  {aiModels.map((model) => <option value={model} key={model} />)}
+                </datalist>
               </label>
+              <div className="settings-actions">
+                <button className="settings-secondary" onClick={() => void fetchAiModels()} disabled={aiModelsBusy}>
+                  {aiModelsBusy ? t.aiWorking : t.aiFetchModels}
+                </button>
+                <button className="settings-secondary" onClick={() => {
+                  setAiOpen(true);
+                  setSettingsOpen(false);
+                }}>{t.openAiAssistant}</button>
+              </div>
               <p className="settings-hint">{t.aiPrivacyHint}</p>
             </div>
             <div className="settings-section">

@@ -41,6 +41,7 @@ interface Window {
       messages: Array<{ role: "system" | "user" | "assistant"; content: string }>;
       temperature?: number;
     }) => Promise<{ content: string }>;
+    aiListModels: (payload: { apiKey: string; baseUrl: string }) => Promise<{ models: string[] }>;
     setDirty: (dirty: boolean) => void;
     closeAfterSave: () => void;
     onMenu: (channel: string, callback: (payload?: unknown) => void) => () => void;

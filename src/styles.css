@@ -1035,6 +1035,10 @@ button { color: inherit; border: 0; background: transparent; cursor: pointer; }
   color: var(--text);
   background: rgba(148, 163, 184, .14);
 }
+.settings-secondary:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
 .settings-section {
   display: grid;
   gap: 12px;
@@ -1092,6 +1096,11 @@ button { color: inherit; border: 0; background: transparent; cursor: pointer; }
 .settings-field input:focus {
   border-color: color-mix(in srgb, var(--brand), var(--line) 40%);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand), transparent 82%);
+}
+.settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 .settings-hint {
   margin: 0;
