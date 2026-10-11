@@ -658,6 +658,36 @@ button { color: inherit; border: 0; background: transparent; cursor: pointer; }
   white-space: pre-wrap;
   line-height: 1.6;
 }
+.ai-message-content {
+  font-size: 13px;
+  line-height: 1.58;
+}
+.ai-message-content.markdown-body {
+  padding: 0;
+}
+.ai-message-content.markdown-body > * {
+  margin-top: 0;
+  margin-bottom: 8px;
+}
+.ai-message-content.markdown-body > *:last-child {
+  margin-bottom: 0;
+}
+.ai-message-content.markdown-body h1,
+.ai-message-content.markdown-body h2,
+.ai-message-content.markdown-body h3 {
+  font-size: 14px;
+  margin: 4px 0 8px;
+}
+.ai-message-content .md-code-block {
+  margin: 8px 0;
+  max-width: 100%;
+}
+.ai-message-content .md-code-block pre {
+  max-height: 240px;
+}
+.ai-message-content .md-code-block figcaption {
+  min-height: 24px;
+}
 .ai-message button {
   justify-self: start;
   padding: 5px 8px;
@@ -1110,7 +1140,8 @@ button { color: inherit; border: 0; background: transparent; cursor: pointer; }
   color: var(--muted);
   font-size: 12px;
 }
-.settings-field input {
+.settings-field input,
+.settings-field textarea {
   height: 34px;
   width: 100%;
   border: 1px solid var(--line);
@@ -1120,9 +1151,28 @@ button { color: inherit; border: 0; background: transparent; cursor: pointer; }
   padding: 0 10px;
   outline: none;
 }
-.settings-field input:focus {
+.settings-field textarea {
+  min-height: 86px;
+  resize: vertical;
+  padding: 9px 10px;
+  line-height: 1.5;
+}
+.settings-field input:focus,
+.settings-field textarea:focus {
   border-color: color-mix(in srgb, var(--brand), var(--line) 40%);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand), transparent 82%);
+}
+.settings-check {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--text);
+  font-size: 13px;
+}
+.settings-check input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--brand);
 }
 .settings-actions {
   display: flex;
@@ -1171,6 +1221,19 @@ button { color: inherit; border: 0; background: transparent; cursor: pointer; }
   width: 100%;
   max-height: 220px;
   overflow: auto;
+}
+.ai-memory-box {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--line), var(--brand) 16%);
+  border-radius: 7px;
+  background: rgba(15, 23, 42, .12);
+}
+.ai-memory-box h4 {
+  margin: 0;
+  color: var(--text);
+  font-size: 13px;
 }
 
 .markdown-body {

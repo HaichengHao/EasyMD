@@ -67,6 +67,14 @@ type AiResultState = {
   from?: number;
   to?: number;
 };
+type AiMemorySettings = {
+  enabled: boolean;
+  preference: string;
+};
+type AiAppliedDraft = {
+  messageIndex: number;
+  before: string;
+};
 
 interface ToastState {
   id: number;
@@ -199,6 +207,13 @@ const zh = {
   copyDetails: "\u590d\u5236\u8be6\u60c5",
   aiChatIntro: "\u6211\u53ef\u4ee5\u5e2e\u4f60\u603b\u7ed3\u3001\u6539\u5199\u3001\u7ffb\u8bd1\u6216\u68c0\u67e5\u5f53\u524d Markdown\u3002",
   aiPrivacyHint: "API Key \u4ec5\u4fdd\u5b58\u5728\u672c\u673a localStorage\uff0c\u8bf7\u786e\u8ba4\u4f60\u4f7f\u7528\u7684\u63a5\u53e3\u4fe1\u4efb\u5f53\u524d\u6587\u6863\u5185\u5bb9\u3002",
+  aiMemory: "AI \u8bb0\u5fc6",
+  aiMemoryEnabled: "\u4fdd\u5b58 AI \u5bf9\u8bdd\u8bb0\u5f55",
+  aiMemoryPreference: "\u5168\u5c40\u504f\u597d",
+  aiMemoryPlaceholder: "\u4f8b\u5982\uff1a\u9ed8\u8ba4\u7ffb\u8bd1\u6210\u7b80\u4f53\u4e2d\u6587\uff0c\u56de\u7b54\u7b80\u6d01\uff0c\u4fdd\u7559 Markdown \u7ed3\u6784\u3002",
+  aiMemoryHint: "AI \u8bb0\u5fc6\u4ec5\u4fdd\u5b58\u5728\u672c\u673a localStorage\uff0c\u53ef\u968f\u65f6\u6e05\u9664\u3002",
+  aiMemoryCleared: "AI \u8bb0\u5fc6\u5df2\u6e05\u9664",
+  clearAiMemory: "\u6e05\u9664 AI \u8bb0\u5fc6",
   aiSummarizeSelection: "AI \u603b\u7ed3\u9009\u4e2d",
   aiPolishSelection: "AI \u6da6\u8272\u9009\u4e2d",
   aiTranslateSelection: "AI \u7ffb\u8bd1\u9009\u4e2d",
@@ -206,6 +221,9 @@ const zh = {
   aiResult: "AI \u7ed3\u679c",
   aiReplaceSelection: "\u66ff\u6362\u9009\u4e2d",
   aiInsertAtCursor: "\u63d2\u5165\u5230\u5149\u6807",
+  aiApplyToEditor: "\u5e94\u7528\u5230\u7f16\u8f91\u533a",
+  aiReplaceDocument: "\u66ff\u6362\u5168\u6587",
+  aiUndoApply: "\u64a4\u9500\u5e94\u7528",
   apply: "\u5e94\u7528",
   discard: "\u4e22\u5f03"
 };
@@ -318,6 +336,13 @@ const en: typeof zh = {
   copyDetails: "Copy Details",
   aiChatIntro: "I can summarize, rewrite, translate, or review the current Markdown document.",
   aiPrivacyHint: "The API key is stored only in localStorage. Make sure your endpoint is trusted before sending document content.",
+  aiMemory: "AI Memory",
+  aiMemoryEnabled: "Save AI conversation history",
+  aiMemoryPreference: "Global Preference",
+  aiMemoryPlaceholder: "For example: translate to Simplified Chinese by default, keep answers concise, and preserve Markdown structure.",
+  aiMemoryHint: "AI memory is stored only in localStorage and can be cleared anytime.",
+  aiMemoryCleared: "AI memory cleared",
+  clearAiMemory: "Clear AI Memory",
   aiSummarizeSelection: "AI Summarize Selection",
   aiPolishSelection: "AI Polish Selection",
   aiTranslateSelection: "AI Translate Selection",
@@ -325,6 +350,9 @@ const en: typeof zh = {
   aiResult: "AI Result",
   aiReplaceSelection: "Replace Selection",
   aiInsertAtCursor: "Insert at Cursor",
+  aiApplyToEditor: "Apply to Editor",
+  aiReplaceDocument: "Replace Document",
+  aiUndoApply: "Undo Apply",
   apply: "Apply",
   discard: "Discard"
 };
@@ -589,6 +617,22 @@ function cleanAiContent(value: string) {
     .trim();
 }
 
+function loadAiMessages() {
+  try {
+    const saved = JSON.parse(localStorage.getItem("easymd.ai.messages") || "[]") as AiMessage[];
+    return Array.isArray(saved) ? saved.slice(-40) : [];
+  } catch {
+    return [];
+  }
+}
+
+function loadAiMemorySettings(): AiMemorySettings {
+  return {
+    enabled: localStorage.getItem("easymd.ai.memory.enabled") === "true",
+    preference: localStorage.getItem("easymd.ai.memory.preference") || ""
+  };
+}
+
 function loadShortcuts() {
   try {
     const saved = JSON.parse(localStorage.getItem("easymd.shortcuts") || "{}") as Partial<Record<ShortcutAction, string>>;
@@ -654,7 +698,9 @@ export function App() {
   const [aiInput, setAiInput] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
   const [aiModelsBusy, setAiModelsBusy] = useState(false);
-  const [aiMessages, setAiMessages] = useState<AiMessage[]>([]);
+  const [aiMemory, setAiMemory] = useState<AiMemorySettings>(() => loadAiMemorySettings());
+  const [aiMessages, setAiMessages] = useState<AiMessage[]>(() => loadAiMemorySettings().enabled ? loadAiMessages() : []);
+  const [aiAppliedDraft, setAiAppliedDraft] = useState<AiAppliedDraft | null>(null);
   const [aiResult, setAiResult] = useState<AiResultState | null>(null);
   const customThemeInputRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
@@ -882,13 +928,23 @@ export function App() {
       notify(t.aiNoApiKey, undefined, "warning");
       throw new Error(t.aiNoApiKey);
     }
+    const preference = aiMemory.preference.trim();
+    const preparedMessages = preference
+      ? [
+        {
+          role: "system" as const,
+          content: `User's persistent EasyMD preference:\n${preference}`
+        },
+        ...messages
+      ]
+      : messages;
     setAiBusy(true);
     try {
       const result = await window.easyMD.aiChat({
         apiKey: aiApiKey,
         baseUrl: aiBaseUrl,
         model: aiModel,
-        messages,
+        messages: preparedMessages,
         temperature: 0.3
       });
       return cleanAiContent(result.content);
@@ -940,7 +996,7 @@ export function App() {
     setAiOpen(true);
     try {
       const answer = await callAi([
-        { role: "system", content: "You are EasyMD's Markdown assistant. Answer in the user's UI language. Be concise, practical, and preserve Markdown syntax when proposing edits. Return the final answer only; do not include reasoning, analysis, hidden thoughts, or <think> tags." },
+        { role: "system", content: "You are EasyMD's Markdown assistant. Answer in the user's UI language. Be concise, practical, and preserve Markdown syntax when proposing edits. If the user asks you to generate, rewrite, expand, or replace document content, return directly usable Markdown. Return the final answer only; do not include reasoning, analysis, hidden thoughts, or <think> tags." },
         { role: "user", content: `Current file: ${filePath || "Untitled.md"}\n\nCurrent Markdown document:\n\n${truncateForAi(markdown)}` },
         ...nextMessages.map((message) => ({ role: message.role, content: message.content }))
       ]);
@@ -964,11 +1020,12 @@ export function App() {
     });
   }
 
-  function applyAiMessage(message: AiMessage) {
+  function applyAiMessage(message: AiMessage, messageIndex: number, target: "auto" | "document" = "auto") {
     if (message.role !== "assistant") return;
     const editor = editorViewRef.current;
-    const from = message.mode === "replace" && typeof message.from === "number" ? message.from : editor?.state.selection.main.from ?? markdown.length;
-    const to = message.mode === "replace" && typeof message.to === "number" ? message.to : from;
+    const from = target === "document" ? 0 : message.mode === "replace" && typeof message.from === "number" ? message.from : editor?.state.selection.main.from ?? markdown.length;
+    const to = target === "document" ? markdown.length : message.mode === "replace" && typeof message.to === "number" ? message.to : from;
+    setAiAppliedDraft({ messageIndex, before: markdown });
     setMarkdown(markdown.slice(0, from) + message.content + markdown.slice(to));
     setDirty(true);
     requestAnimationFrame(() => {
@@ -977,11 +1034,35 @@ export function App() {
     });
   }
 
+  function undoAiApply() {
+    if (!aiAppliedDraft) return;
+    setMarkdown(aiAppliedDraft.before);
+    setDirty(true);
+    setAiAppliedDraft(null);
+    requestAnimationFrame(() => editorViewRef.current?.focus());
+  }
+
   function saveAiSetting(kind: "apiKey" | "baseUrl" | "model", value: string) {
     if (kind === "apiKey") setAiApiKey(value);
     if (kind === "baseUrl") setAiBaseUrl(value);
     if (kind === "model") setAiModel(value);
     localStorage.setItem(`easymd.ai.${kind}`, value);
+  }
+
+  function updateAiMemory(next: Partial<AiMemorySettings>) {
+    const merged = { ...aiMemory, ...next };
+    setAiMemory(merged);
+    localStorage.setItem("easymd.ai.memory.enabled", String(merged.enabled));
+    localStorage.setItem("easymd.ai.memory.preference", merged.preference);
+    if (merged.enabled) {
+      localStorage.setItem("easymd.ai.messages", JSON.stringify(aiMessages.slice(-40)));
+    }
+  }
+
+  function clearAiMemory() {
+    setAiMessages([]);
+    localStorage.removeItem("easymd.ai.messages");
+    notify(t.aiMemoryCleared, undefined, "success");
   }
 
   async function fetchAiModels() {
@@ -1446,6 +1527,11 @@ export function App() {
   }, [dirty]);
 
   useEffect(() => {
+    if (!aiMemory.enabled) return;
+    localStorage.setItem("easymd.ai.messages", JSON.stringify(aiMessages.slice(-40)));
+  }, [aiMessages, aiMemory.enabled]);
+
+  useEffect(() => {
     const hide = () => setContextMenu(null);
     const onCopy = (event: MouseEvent) => {
       const button = (event.target as HTMLElement).closest("[data-copy-code]");
@@ -1674,10 +1760,20 @@ export function App() {
             {aiMessages.map((message, index) => (
               <article key={`${message.role}-${index}`} className={`ai-message ${message.role}`}>
                 <small>{message.actionTitle || (message.role === "user" ? "You" : "EasyMD AI")}</small>
-                <p>{message.content}</p>
+                <div
+                  className="ai-message-content markdown-body"
+                  dangerouslySetInnerHTML={{ __html: renderMarkdown(message.content, { codeLineNumbers, copyLabel: t.copy, basePath: filePath }) }}
+                />
                 {message.role === "assistant" && (
                   <div className="ai-message-actions">
-                    <button onClick={() => applyAiMessage(message)}>{message.mode === "replace" ? t.aiReplaceSelection : t.aiInsertAtCursor}</button>
+                    {aiAppliedDraft?.messageIndex === index ? (
+                      <button onClick={undoAiApply}>{t.aiUndoApply}</button>
+                    ) : (
+                      <>
+                        <button onClick={() => applyAiMessage(message, index)}>{message.mode === "replace" ? t.aiReplaceSelection : t.aiApplyToEditor}</button>
+                        {message.mode !== "replace" && <button onClick={() => applyAiMessage(message, index, "document")}>{t.aiReplaceDocument}</button>}
+                      </>
+                    )}
                     <button onClick={() => void navigator.clipboard.writeText(message.content).then(() => notify(t.copied, undefined, "success"))}>{t.copy}</button>
                   </div>
                 )}
@@ -1869,6 +1965,29 @@ export function App() {
                 }}>{t.openAiAssistant}</button>
               </div>
               <p className="settings-hint">{t.aiPrivacyHint}</p>
+              <div className="ai-memory-box">
+                <h4>{t.aiMemory}</h4>
+                <label className="settings-check">
+                  <input
+                    type="checkbox"
+                    checked={aiMemory.enabled}
+                    onChange={(event) => updateAiMemory({ enabled: event.target.checked })}
+                  />
+                  <span>{t.aiMemoryEnabled}</span>
+                </label>
+                <label className="settings-field">
+                  <span>{t.aiMemoryPreference}</span>
+                  <textarea
+                    value={aiMemory.preference}
+                    placeholder={t.aiMemoryPlaceholder}
+                    onChange={(event) => updateAiMemory({ preference: event.target.value })}
+                  />
+                </label>
+                <div className="settings-actions">
+                  <button className="settings-secondary" onClick={clearAiMemory}>{t.clearAiMemory}</button>
+                </div>
+                <p className="settings-hint">{t.aiMemoryHint}</p>
+              </div>
             </div>
             <div className="settings-section">
               <h3>{t.zoom}</h3>
