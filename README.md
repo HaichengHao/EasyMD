@@ -93,7 +93,7 @@ AI is disabled until the user provides their own API configuration in Settings:
 
 ```text
 API Key:  your own provider key
-Base URL: https://api.openai.com/v1, or another OpenAI-compatible endpoint
+Base URL: your provider's OpenAI-compatible endpoint, for example https://your-provider.example/v1
 Model:    the model name supported by that endpoint
 ```
 

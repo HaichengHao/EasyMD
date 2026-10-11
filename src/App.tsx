@@ -76,6 +76,9 @@ type AiAppliedDraft = {
   before: string;
 };
 
+const AI_SECRET_RESET_VERSION = "0.2.1";
+let aiSecretsResetChecked = false;
+
 interface ToastState {
   id: number;
   title: string;
@@ -200,6 +203,8 @@ const zh = {
   aiAskPlaceholder: "\u8be2\u95ee\u5f53\u524d Markdown \u6587\u6863...",
   aiSend: "\u53d1\u9001",
   aiNoApiKey: "\u8bf7\u5148\u5728\u8bbe\u7f6e\u91cc\u586b\u5199 AI API Key\u3002",
+  aiNoBaseUrl: "\u8bf7\u5148\u5728\u8bbe\u7f6e\u91cc\u586b\u5199 AI Base URL\u3002",
+  aiNoModel: "\u8bf7\u5148\u5728\u8bbe\u7f6e\u91cc\u586b\u5199 AI \u6a21\u578b\u3002",
   aiWorking: "AI \u6b63\u5728\u601d\u8003...",
   aiFailed: "AI \u8bf7\u6c42\u5931\u8d25",
   errorDetails: "\u9519\u8bef\u8be6\u60c5",
@@ -329,6 +334,8 @@ const en: typeof zh = {
   aiAskPlaceholder: "Ask about the current Markdown document...",
   aiSend: "Send",
   aiNoApiKey: "Add an AI API key in Settings first.",
+  aiNoBaseUrl: "Add an AI Base URL in Settings first.",
+  aiNoModel: "Add an AI model in Settings first.",
   aiWorking: "AI is thinking...",
   aiFailed: "AI request failed",
   errorDetails: "Error Details",
@@ -633,6 +640,21 @@ function loadAiMemorySettings(): AiMemorySettings {
   };
 }
 
+function clearPersistedAiCredentials() {
+  localStorage.removeItem("easymd.ai.apiKey");
+  localStorage.removeItem("easymd.ai.baseUrl");
+  localStorage.removeItem("easymd.ai.model");
+  localStorage.removeItem("easymd.ai.models");
+}
+
+function ensureAiCredentialReset() {
+  if (aiSecretsResetChecked) return;
+  aiSecretsResetChecked = true;
+  if (localStorage.getItem("easymd.ai.credentialsResetVersion") === AI_SECRET_RESET_VERSION) return;
+  clearPersistedAiCredentials();
+  localStorage.setItem("easymd.ai.credentialsResetVersion", AI_SECRET_RESET_VERSION);
+}
+
 function loadShortcuts() {
   try {
     const saved = JSON.parse(localStorage.getItem("easymd.shortcuts") || "{}") as Partial<Record<ShortcutAction, string>>;
@@ -654,6 +676,7 @@ function eventToShortcut(event: KeyboardEvent | React.KeyboardEvent) {
 }
 
 export function App() {
+  ensureAiCredentialReset();
   const [markdown, setMarkdown] = useState(demoMarkdown());
   const [filePath, setFilePath] = useState<string>();
   const [dirty, setDirty] = useState(false);
@@ -686,8 +709,8 @@ export function App() {
   const [errorDetail, setErrorDetail] = useState<{ title: string; detail: string } | null>(null);
   const [aiOpen, setAiOpen] = useState(false);
   const [aiApiKey, setAiApiKey] = useState(() => localStorage.getItem("easymd.ai.apiKey") || "");
-  const [aiBaseUrl, setAiBaseUrl] = useState(() => localStorage.getItem("easymd.ai.baseUrl") || "https://api.openai.com/v1");
-  const [aiModel, setAiModel] = useState(() => localStorage.getItem("easymd.ai.model") || "gpt-4o-mini");
+  const [aiBaseUrl, setAiBaseUrl] = useState(() => localStorage.getItem("easymd.ai.baseUrl") || "");
+  const [aiModel, setAiModel] = useState(() => localStorage.getItem("easymd.ai.model") || "");
   const [aiModels, setAiModels] = useState<string[]>(() => {
     try {
       return JSON.parse(localStorage.getItem("easymd.ai.models") || "[]") as string[];
@@ -928,6 +951,16 @@ export function App() {
       notify(t.aiNoApiKey, undefined, "warning");
       throw new Error(t.aiNoApiKey);
     }
+    if (!aiBaseUrl.trim()) {
+      setSettingsOpen(true);
+      notify(t.aiNoBaseUrl, undefined, "warning");
+      throw new Error(t.aiNoBaseUrl);
+    }
+    if (!aiModel.trim()) {
+      setSettingsOpen(true);
+      notify(t.aiNoModel, undefined, "warning");
+      throw new Error(t.aiNoModel);
+    }
     const preference = aiMemory.preference.trim();
     const preparedMessages = preference
       ? [
@@ -1068,6 +1101,10 @@ export function App() {
   async function fetchAiModels() {
     if (!aiApiKey.trim()) {
       notify(t.aiNoApiKey, undefined, "warning");
+      return;
+    }
+    if (!aiBaseUrl.trim()) {
+      notify(t.aiNoBaseUrl, undefined, "warning");
       return;
     }
     setAiModelsBusy(true);
@@ -1933,7 +1970,7 @@ export function App() {
                 <span>{t.aiBaseUrl}</span>
                 <input
                   value={aiBaseUrl}
-                  placeholder="https://api.openai.com/v1"
+                  placeholder="https://api.example.com/v1"
                   onChange={(event) => saveAiSetting("baseUrl", event.target.value)}
                 />
               </label>
@@ -1950,7 +1987,7 @@ export function App() {
                 ) : (
                   <input
                     value={aiModel}
-                    placeholder="gpt-4o-mini"
+                    placeholder="model-name"
                     onChange={(event) => saveAiSetting("model", event.target.value)}
                   />
                 )}

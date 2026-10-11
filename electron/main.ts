@@ -417,7 +417,10 @@ ipcMain.handle("ai:chat", async (_event, payload: AiChatPayload) => {
   if (!payload.model?.trim()) {
     throw new Error("AI model is missing.");
   }
-  const baseUrl = (payload.baseUrl || "https://api.openai.com/v1").replace(/\/+$/, "");
+  if (!payload.baseUrl?.trim()) {
+    throw new Error("AI base URL is missing.");
+  }
+  const baseUrl = payload.baseUrl.trim().replace(/\/+$/, "");
   const response = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
     headers: {
@@ -445,7 +448,10 @@ ipcMain.handle("ai:list-models", async (_event, payload: AiProviderPayload) => {
   if (!payload.apiKey?.trim()) {
     throw new Error("AI API key is missing.");
   }
-  const baseUrl = (payload.baseUrl || "https://api.openai.com/v1").replace(/\/+$/, "");
+  if (!payload.baseUrl?.trim()) {
+    throw new Error("AI base URL is missing.");
+  }
+  const baseUrl = payload.baseUrl.trim().replace(/\/+$/, "");
   const fallback = fallbackAiModels(baseUrl);
   try {
     const response = await fetch(`${baseUrl}/models`, {
