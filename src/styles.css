@@ -665,6 +665,14 @@ button { color: inherit; border: 0; background: transparent; cursor: pointer; }
   color: var(--text);
   background: rgba(148, 163, 184, .14);
 }
+.ai-message-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ai-message-actions button {
+  justify-self: auto;
+}
 .ai-thinking {
   color: var(--muted);
   padding: 6px 2px;

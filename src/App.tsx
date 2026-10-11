@@ -52,7 +52,14 @@ type ThemeName = BuiltInThemeName | "custom" | `user:${string}`;
 type ShortcutAction = "save" | "open" | "newFile" | "undo" | "redo" | "bold" | "italic" | "link" | "codeBlock" | "source" | "preview" | "split" | "toggleSidebar" | "settings" | "find" | "replace" | "aiAssistant";
 type Language = "zh-CN" | "en-US";
 type ToastTone = "success" | "warning" | "error" | "info";
-type AiMessage = { role: "user" | "assistant"; content: string };
+type AiMessage = {
+  role: "user" | "assistant";
+  content: string;
+  actionTitle?: string;
+  mode?: "insert" | "replace";
+  from?: number;
+  to?: number;
+};
 type AiResultState = {
   title: string;
   content: string;
@@ -573,6 +580,15 @@ function shortErrorMessage(message: string) {
   return message.length > 180 ? `${message.slice(0, 180)}...` : message;
 }
 
+function cleanAiContent(value: string) {
+  return value
+    .replace(/<think>[\s\S]*?<\/think>/gi, "")
+    .replace(/<think>[\s\S]*$/gi, "")
+    .replace(/^\s*```(?:markdown|md)?\s*/i, "")
+    .replace(/\s*```\s*$/i, "")
+    .trim();
+}
+
 function loadShortcuts() {
   try {
     const saved = JSON.parse(localStorage.getItem("easymd.shortcuts") || "{}") as Partial<Record<ShortcutAction, string>>;
@@ -749,7 +765,7 @@ export function App() {
   }
 
   function newFile() {
-    setMarkdown(demoMarkdown());
+    setMarkdown("");
     setFilePath(undefined);
     setDirty(false);
   }
@@ -875,7 +891,7 @@ export function App() {
         messages,
         temperature: 0.3
       });
-      return result.content.trim();
+      return cleanAiContent(result.content);
     } finally {
       setAiBusy(false);
     }
@@ -888,23 +904,28 @@ export function App() {
       return;
     }
     setContextMenu(null);
+    setAiOpen(true);
     const instruction = {
       summarize: language === "zh-CN" ? "\u7528\u7b80\u6d01\u7684 Markdown \u8981\u70b9\u603b\u7ed3\u9009\u4e2d\u5185\u5bb9\u3002" : "Summarize the selected content as concise Markdown bullet points.",
       polish: language === "zh-CN" ? "\u5728\u4fdd\u7559 Markdown \u7ed3\u6784\u7684\u524d\u63d0\u4e0b\uff0c\u6da6\u8272\u9009\u4e2d\u5185\u5bb9\uff0c\u76f4\u63a5\u8fd4\u56de\u6539\u5199\u540e\u7684 Markdown\u3002" : "Polish the selected content while preserving Markdown structure. Return only the revised Markdown.",
       translate: language === "zh-CN" ? "\u5c06\u9009\u4e2d\u5185\u5bb9\u7ffb\u8bd1\u4e3a\u7b80\u4f53\u4e2d\u6587\uff0c\u4fdd\u7559 Markdown \u7ed3\u6784\u3002" : "Translate the selected content into English while preserving Markdown structure."
     }[action];
+    const title = action === "summarize" ? t.aiSummarizeSelection : action === "polish" ? t.aiPolishSelection : t.aiTranslateSelection;
+    const mode = action === "summarize" ? "insert" : "replace";
+    setAiMessages((items) => [...items, { role: "user", content: `${title}\n\n${range.text}` }]);
     try {
       const content = await callAi([
-        { role: "system", content: "You are EasyMD's writing assistant. Return Markdown only. Do not wrap the answer in code fences unless the user content requires code fences." },
+        { role: "system", content: "You are EasyMD's writing assistant. Return the final Markdown answer only. Do not include reasoning, analysis, hidden thoughts, or <think> tags. Do not wrap the answer in code fences unless the user content requires code fences." },
         { role: "user", content: `${instruction}\n\nSelected Markdown:\n\n${range.text}` }
       ]);
-      setAiResult({
-        title: action === "summarize" ? t.aiSummarizeSelection : action === "polish" ? t.aiPolishSelection : t.aiTranslateSelection,
+      setAiMessages((items) => [...items, {
+        role: "assistant",
+        actionTitle: title,
         content,
-        mode: action === "summarize" ? "insert" : "replace",
+        mode,
         from: range.from,
         to: range.to
-      });
+      }]);
     } catch (error) {
       notifyError(t.aiFailed, error);
     }
@@ -919,11 +940,11 @@ export function App() {
     setAiOpen(true);
     try {
       const answer = await callAi([
-        { role: "system", content: "You are EasyMD's Markdown assistant. Answer in the user's UI language. Be concise, practical, and preserve Markdown syntax when proposing edits." },
+        { role: "system", content: "You are EasyMD's Markdown assistant. Answer in the user's UI language. Be concise, practical, and preserve Markdown syntax when proposing edits. Return the final answer only; do not include reasoning, analysis, hidden thoughts, or <think> tags." },
         { role: "user", content: `Current file: ${filePath || "Untitled.md"}\n\nCurrent Markdown document:\n\n${truncateForAi(markdown)}` },
         ...nextMessages.map((message) => ({ role: message.role, content: message.content }))
       ]);
-      setAiMessages((items) => [...items, { role: "assistant", content: answer }]);
+      setAiMessages((items) => [...items, { role: "assistant", content: answer, mode: "insert" }]);
     } catch (error) {
       notifyError(t.aiFailed, error);
     }
@@ -940,6 +961,19 @@ export function App() {
     requestAnimationFrame(() => {
       editor?.focus();
       editor?.dispatch({ selection: { anchor: from + aiResult.content.length } });
+    });
+  }
+
+  function applyAiMessage(message: AiMessage) {
+    if (message.role !== "assistant") return;
+    const editor = editorViewRef.current;
+    const from = message.mode === "replace" && typeof message.from === "number" ? message.from : editor?.state.selection.main.from ?? markdown.length;
+    const to = message.mode === "replace" && typeof message.to === "number" ? message.to : from;
+    setMarkdown(markdown.slice(0, from) + message.content + markdown.slice(to));
+    setDirty(true);
+    requestAnimationFrame(() => {
+      editor?.focus();
+      editor?.dispatch({ selection: { anchor: from + message.content.length } });
     });
   }
 
@@ -1639,10 +1673,13 @@ export function App() {
             )}
             {aiMessages.map((message, index) => (
               <article key={`${message.role}-${index}`} className={`ai-message ${message.role}`}>
-                <small>{message.role === "user" ? "You" : "EasyMD AI"}</small>
+                <small>{message.actionTitle || (message.role === "user" ? "You" : "EasyMD AI")}</small>
                 <p>{message.content}</p>
                 {message.role === "assistant" && (
-                  <button onClick={() => setAiResult({ title: t.aiResult, content: message.content, mode: "insert" })}>{t.aiInsertAtCursor}</button>
+                  <div className="ai-message-actions">
+                    <button onClick={() => applyAiMessage(message)}>{message.mode === "replace" ? t.aiReplaceSelection : t.aiInsertAtCursor}</button>
+                    <button onClick={() => void navigator.clipboard.writeText(message.content).then(() => notify(t.copied, undefined, "success"))}>{t.copy}</button>
+                  </div>
                 )}
               </article>
             ))}
