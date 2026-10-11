@@ -65,6 +65,7 @@ interface ToastState {
   id: number;
   title: string;
   detail?: string;
+  fullDetail?: string;
   tone: ToastTone;
 }
 
@@ -186,6 +187,9 @@ const zh = {
   aiNoApiKey: "\u8bf7\u5148\u5728\u8bbe\u7f6e\u91cc\u586b\u5199 AI API Key\u3002",
   aiWorking: "AI \u6b63\u5728\u601d\u8003...",
   aiFailed: "AI \u8bf7\u6c42\u5931\u8d25",
+  errorDetails: "\u9519\u8bef\u8be6\u60c5",
+  details: "\u8be6\u60c5",
+  copyDetails: "\u590d\u5236\u8be6\u60c5",
   aiChatIntro: "\u6211\u53ef\u4ee5\u5e2e\u4f60\u603b\u7ed3\u3001\u6539\u5199\u3001\u7ffb\u8bd1\u6216\u68c0\u67e5\u5f53\u524d Markdown\u3002",
   aiPrivacyHint: "API Key \u4ec5\u4fdd\u5b58\u5728\u672c\u673a localStorage\uff0c\u8bf7\u786e\u8ba4\u4f60\u4f7f\u7528\u7684\u63a5\u53e3\u4fe1\u4efb\u5f53\u524d\u6587\u6863\u5185\u5bb9\u3002",
   aiSummarizeSelection: "AI \u603b\u7ed3\u9009\u4e2d",
@@ -302,6 +306,9 @@ const en: typeof zh = {
   aiNoApiKey: "Add an AI API key in Settings first.",
   aiWorking: "AI is thinking...",
   aiFailed: "AI request failed",
+  errorDetails: "Error Details",
+  details: "Details",
+  copyDetails: "Copy Details",
   aiChatIntro: "I can summarize, rewrite, translate, or review the current Markdown document.",
   aiPrivacyHint: "The API key is stored only in localStorage. Make sure your endpoint is trusted before sending document content.",
   aiSummarizeSelection: "AI Summarize Selection",
@@ -554,6 +561,18 @@ function truncateForAi(value: string, maxLength = 18000) {
   return `${value.slice(0, maxLength)}\n\n...[truncated by EasyMD]`;
 }
 
+function cleanErrorMessage(error: unknown) {
+  const raw = error instanceof Error ? error.message : String(error);
+  return raw
+    .replace(/^Error invoking remote method '[^']+':\s*/i, "")
+    .replace(/^Error:\s*/i, "")
+    .trim();
+}
+
+function shortErrorMessage(message: string) {
+  return message.length > 180 ? `${message.slice(0, 180)}...` : message;
+}
+
 function loadShortcuts() {
   try {
     const saved = JSON.parse(localStorage.getItem("easymd.shortcuts") || "{}") as Partial<Record<ShortcutAction, string>>;
@@ -604,6 +623,7 @@ export function App() {
   const [userThemes, setUserThemes] = useState<EasyMDUserTheme[]>([]);
   const [toasts, setToasts] = useState<ToastState[]>([]);
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
+  const [errorDetail, setErrorDetail] = useState<{ title: string; detail: string } | null>(null);
   const [aiOpen, setAiOpen] = useState(false);
   const [aiApiKey, setAiApiKey] = useState(() => localStorage.getItem("easymd.ai.apiKey") || "");
   const [aiBaseUrl, setAiBaseUrl] = useState(() => localStorage.getItem("easymd.ai.baseUrl") || "https://api.openai.com/v1");
@@ -654,12 +674,17 @@ export function App() {
     "--split-left": `${splitRatio}%`
   } as CSSProperties;
 
-  function notify(title: string, detail?: string, tone: ToastTone = "info") {
+  function notify(title: string, detail?: string, tone: ToastTone = "info", fullDetail?: string) {
     const id = Date.now() + Math.random();
-    setToasts((items) => [...items.slice(-3), { id, title, detail, tone }]);
+    setToasts((items) => [...items.slice(-3), { id, title, detail, tone, fullDetail }]);
     window.setTimeout(() => {
       setToasts((items) => items.filter((item) => item.id !== id));
-    }, tone === "error" ? 5200 : 3400);
+    }, tone === "error" ? 9000 : 3400);
+  }
+
+  function notifyError(title: string, error: unknown) {
+    const detail = cleanErrorMessage(error);
+    notify(title, shortErrorMessage(detail), "error", detail);
   }
 
   function dismissToast(id: number) {
@@ -881,7 +906,7 @@ export function App() {
         to: range.to
       });
     } catch (error) {
-      notify(t.aiFailed, error instanceof Error ? error.message : String(error), "error");
+      notifyError(t.aiFailed, error);
     }
   }
 
@@ -900,7 +925,7 @@ export function App() {
       ]);
       setAiMessages((items) => [...items, { role: "assistant", content: answer }]);
     } catch (error) {
-      notify(t.aiFailed, error instanceof Error ? error.message : String(error), "error");
+      notifyError(t.aiFailed, error);
     }
   }
 
@@ -943,7 +968,7 @@ export function App() {
       if (!models.includes(aiModel)) saveAiSetting("model", models[0]);
       notify(result.fallback ? t.aiModelsFallback : t.aiModelsLoaded, models.join(", "), result.fallback ? "info" : "success");
     } catch (error) {
-      notify(t.aiModelFetchFailed, error instanceof Error ? error.message : String(error), "error");
+      notifyError(t.aiModelFetchFailed, error);
     } finally {
       setAiModelsBusy(false);
     }
@@ -1665,6 +1690,15 @@ export function App() {
               <strong>{toast.title}</strong>
               {toast.detail && <span>{toast.detail}</span>}
             </div>
+            {toast.fullDetail && (
+              <button
+                className="toast-detail-button"
+                onClick={() => setErrorDetail({ title: toast.title, detail: toast.fullDetail || toast.detail || "" })}
+                title={t.details}
+              >
+                {t.details}
+              </button>
+            )}
             <button onClick={() => dismissToast(toast.id)} title={t.close}><X size={14} /></button>
           </section>
         ))}
@@ -1693,6 +1727,22 @@ export function App() {
                 action();
               }}>{confirmState.primary}</button>
             </div>
+          </section>
+        </div>
+      )}
+
+      {errorDetail && (
+        <div className="ai-result-backdrop" onMouseDown={() => setErrorDetail(null)}>
+          <section className="ai-result-panel error-detail-panel" onMouseDown={(event) => event.stopPropagation()} role="dialog" aria-modal="true">
+            <header>
+              <strong>{errorDetail.title || t.errorDetails}</strong>
+              <button title={t.close} onClick={() => setErrorDetail(null)}><X size={15} /></button>
+            </header>
+            <pre>{errorDetail.detail}</pre>
+            <footer>
+              <button onClick={() => void navigator.clipboard.writeText(errorDetail.detail).then(() => notify(t.copied, undefined, "success"))}>{t.copyDetails}</button>
+              <button className="primary" onClick={() => setErrorDetail(null)}>{t.close}</button>
+            </footer>
           </section>
         </div>
       )}

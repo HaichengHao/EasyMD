@@ -745,6 +745,14 @@ button { color: inherit; border: 0; background: transparent; cursor: pointer; }
 .ai-result-panel footer button.primary {
   background: color-mix(in srgb, var(--brand), transparent 68%);
 }
+.error-detail-panel {
+  width: min(840px, calc(100vw - 36px));
+}
+.error-detail-panel pre {
+  min-height: 220px;
+  color: #fecaca;
+  background: rgba(127, 29, 29, .12);
+}
 
 .find-panel {
   position: fixed;
@@ -867,7 +875,7 @@ button { color: inherit; border: 0; background: transparent; cursor: pointer; }
 .app-toast {
   pointer-events: auto;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 10px;
   padding: 12px 10px 12px 12px;
@@ -911,11 +919,19 @@ button { color: inherit; border: 0; background: transparent; cursor: pointer; }
   font-size: 12px;
 }
 .app-toast button {
-  width: 26px;
+  min-width: 26px;
   height: 26px;
+  padding: 0 7px;
   border-radius: 5px;
   color: var(--muted);
   background: transparent;
+}
+.app-toast .toast-detail-button {
+  width: auto;
+  color: var(--text);
+  background: rgba(148, 163, 184, .14);
+  font-size: 12px;
+  white-space: nowrap;
 }
 .app-toast button:hover {
   color: var(--text);
