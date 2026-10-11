@@ -77,12 +77,13 @@ jobs:
         with:
           path: artifacts
 
-      - name: Create draft release
+      - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          draft: true
+          draft: false
           prerelease: false
           generate_release_notes: true
+          name: EasyMD ${{ github.ref_name }}
           files: |
             artifacts/win_x86_64_installer/win_x86_64_installer.exe
             artifacts/linux_packages/easymd.deb
