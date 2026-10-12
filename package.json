@@ -1,6 +1,6 @@
 {
   "name": "easymd",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "A lightweight cross-platform Markdown desktop editor.",
   "author": "EasyMD Contributors",
   "main": "dist-electron/main.cjs",
@@ -19,6 +19,10 @@
   "build": {
     "appId": "dev.easymd.editor",
     "productName": "EasyMD",
+    "executableName": "EasyMD",
+    "extraMetadata": {
+      "name": "EasyMD"
+    },
     "icon": "assets/icon.png",
     "directories": {
       "output": "release"
@@ -40,6 +44,19 @@
       "icon": "assets/icon.ico",
       "artifactName": "win_x86_64_installer.${ext}"
     },
+    "fileAssociations": [
+      {
+        "ext": [
+          "md",
+          "markdown",
+          "mdown"
+        ],
+        "name": "Markdown Document",
+        "description": "Markdown document",
+        "role": "Editor",
+        "icon": "assets/icon.ico"
+      }
+    ],
     "portable": {
       "artifactName": "${productName}_portable.${ext}"
     },

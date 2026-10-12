@@ -240,7 +240,18 @@ button { color: inherit; border: 0; background: transparent; cursor: pointer; }
   text-align: left;
   color: var(--muted);
 }
-.file-card.active, .file-card:hover { background: var(--sidebar-active); }
+.file-card-row {
+  position: relative;
+}
+.file-card-row .file-card {
+  padding-right: 52px;
+}
+.file-card.active,
+.file-card:hover,
+.file-card-row.active .file-card,
+.file-card-row:hover .file-card {
+  background: var(--sidebar-active);
+}
 .file-card small { font-size: 12px; opacity: .75; }
 .file-card strong {
   overflow: hidden;
@@ -254,6 +265,27 @@ button { color: inherit; border: 0; background: transparent; cursor: pointer; }
   font-size: 14px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.file-remove {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  border-radius: 5px;
+  transform: translateY(-50%);
+  opacity: 0;
+}
+.file-card-row:hover .file-remove,
+.file-remove:focus-visible {
+  opacity: 1;
+}
+.file-remove:hover {
+  color: var(--text);
+  background: rgba(148, 163, 184, .16);
 }
 
 .outline-list { padding-top: 4px; }

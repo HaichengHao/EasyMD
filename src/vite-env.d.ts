@@ -23,11 +23,13 @@ interface EasyMDImportedTheme {
 interface Window {
   easyMD: {
     openFile: () => Promise<EasyMDFileResult | null>;
+    openPath: (filePath: string) => Promise<EasyMDFileResult>;
     saveFile: (payload: { filePath?: string; content: string }) => Promise<EasyMDFileResult | null>;
     imageDataUrl: (filePath: string) => Promise<string | null>;
     selectImage: () => Promise<string | null>;
     exportPdf: (defaultName?: string) => Promise<{ filePath: string } | null>;
     recentFiles: () => Promise<string[]>;
+    removeRecentFile: (filePath: string) => Promise<string[]>;
     listThemes: () => Promise<EasyMDUserTheme[]>;
     refreshThemeMenu: () => Promise<void>;
     importThemeFile: () => Promise<EasyMDImportedTheme | null>;

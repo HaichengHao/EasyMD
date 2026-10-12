@@ -5,6 +5,8 @@ import path from "node:path";
 let recentFiles: string[] = [];
 let documentDirty = false;
 let refreshApplicationMenu: (() => void) | undefined;
+let mainWindow: BrowserWindow | undefined;
+let pendingOpenFilePath: string | undefined;
 const repositoryUrl = "https://github.com/HaichengHao/EasyMD";
 const latestReleaseApi = "https://api.github.com/repos/HaichengHao/EasyMD/releases/latest";
 const imageMimeTypes: Record<string, string> = {
@@ -55,6 +57,12 @@ function getRecentFiles() {
 
 function rememberFile(filePath: string) {
   recentFiles = [filePath, ...getRecentFiles().filter((item) => item !== filePath)].slice(0, 12);
+  refreshApplicationMenu?.();
+}
+
+function forgetFile(filePath: string) {
+  recentFiles = getRecentFiles().filter((item) => item !== filePath);
+  refreshApplicationMenu?.();
 }
 
 function projectRoot() {
@@ -123,6 +131,33 @@ function appInfo() {
   };
 }
 
+function isMarkdownFile(filePath: string) {
+  return [".md", ".markdown", ".mdown", ".txt"].includes(path.extname(filePath).toLowerCase());
+}
+
+function findMarkdownArg(argv: string[]) {
+  return argv.find((item) => {
+    if (!item || item.startsWith("-")) return false;
+    return path.isAbsolute(item) && isMarkdownFile(item);
+  });
+}
+
+async function readMarkdownFile(filePath: string) {
+  const normalized = path.resolve(filePath);
+  const content = await fs.readFile(normalized, "utf8");
+  rememberFile(normalized);
+  return { filePath: normalized, content, recentFiles: getRecentFiles() };
+}
+
+async function sendOpenFile(win: BrowserWindow, filePath: string) {
+  try {
+    const result = await readMarkdownFile(filePath);
+    win.webContents.send("app:open-file", result);
+  } catch {
+    dialog.showErrorBox("EasyMD", `Unable to open file:\n${filePath}`);
+  }
+}
+
 async function checkForUpdates() {
   const currentVersion = app.getVersion();
   try {
@@ -187,12 +222,20 @@ function createWindow() {
       nodeIntegration: false
     }
   });
+  mainWindow = win;
 
   if (process.env.VITE_DEV_SERVER_URL) {
     void win.loadURL(process.env.VITE_DEV_SERVER_URL);
   } else {
     void win.loadFile(path.join(__dirname, "../dist/index.html"));
   }
+
+  win.webContents.once("did-finish-load", () => {
+    if (!pendingOpenFilePath) return;
+    const filePath = pendingOpenFilePath;
+    pendingOpenFilePath = undefined;
+    void sendOpenFile(win, filePath);
+  });
 
   const send = (channel: string, payload?: unknown) => win.webContents.send(channel, payload);
 
@@ -210,6 +253,17 @@ function createWindow() {
       submenu: [
         { label: t("\u65b0\u5efa"), accelerator: "CmdOrCtrl+N", click: () => send("menu:new") },
         { label: t("\u6253\u5f00..."), accelerator: "CmdOrCtrl+O", click: () => send("menu:open") },
+        {
+          label: t("\u6253\u5f00\u6700\u8fd1\u6587\u4ef6"),
+          enabled: getRecentFiles().length > 0,
+          submenu: getRecentFiles().length
+            ? getRecentFiles().map((filePath) => ({
+              label: path.basename(filePath),
+              sublabel: filePath,
+              click: () => send("menu:open-recent", filePath)
+            }))
+            : [{ label: t("\u6682\u65e0\u6700\u8fd1\u6587\u4ef6"), enabled: false }]
+        },
         { label: t("\u4fdd\u5b58"), accelerator: "CmdOrCtrl+S", click: () => send("menu:save") },
         { label: t("\u53e6\u5b58\u4e3a..."), accelerator: "CmdOrCtrl+Shift+S", click: () => send("menu:save-as") },
         { label: t("\u5bfc\u51fa PDF..."), accelerator: "CmdOrCtrl+Shift+E", click: () => send("menu:export-pdf") },
@@ -312,13 +366,48 @@ function createWindow() {
   void rebuildMenu();
 }
 
-app.whenReady().then(createWindow);
-app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") app.quit();
+app.setName("EasyMD");
+if (process.platform === "win32") {
+  app.setAppUserModelId("dev.easymd.editor");
+}
+
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+  app.quit();
+} else {
+  pendingOpenFilePath = findMarkdownArg(process.argv);
+  app.on("second-instance", (_event, argv) => {
+    const filePath = findMarkdownArg(argv);
+    const win = mainWindow || BrowserWindow.getAllWindows()[0];
+    if (win) {
+      if (win.isMinimized()) win.restore();
+      win.focus();
+      if (filePath) void sendOpenFile(win, filePath);
+    } else if (filePath) {
+      pendingOpenFilePath = filePath;
+    }
+  });
+}
+
+app.on("open-file", (event, filePath) => {
+  event.preventDefault();
+  const win = mainWindow || BrowserWindow.getAllWindows()[0];
+  if (win) {
+    void sendOpenFile(win, filePath);
+  } else {
+    pendingOpenFilePath = filePath;
+  }
 });
-app.on("activate", () => {
-  if (BrowserWindow.getAllWindows().length === 0) createWindow();
-});
+
+if (gotSingleInstanceLock) {
+  app.whenReady().then(createWindow);
+  app.on("window-all-closed", () => {
+    if (process.platform !== "darwin") app.quit();
+  });
+  app.on("activate", () => {
+    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  });
+}
 
 ipcMain.handle("file:open", async () => {
   const result = await dialog.showOpenDialog({
@@ -326,11 +415,10 @@ ipcMain.handle("file:open", async () => {
     filters: [{ name: "Markdown", extensions: ["md", "markdown", "mdown", "txt"] }]
   });
   if (result.canceled || !result.filePaths[0]) return null;
-  const filePath = result.filePaths[0];
-  const content = await fs.readFile(filePath, "utf8");
-  rememberFile(filePath);
-  return { filePath, content, recentFiles: getRecentFiles() };
+  return readMarkdownFile(result.filePaths[0]);
 });
+
+ipcMain.handle("file:open-path", async (_event, filePath: string) => readMarkdownFile(filePath));
 
 ipcMain.handle("file:save", async (_event, payload: { filePath?: string; content: string }) => {
   let filePath = payload.filePath;
@@ -348,6 +436,10 @@ ipcMain.handle("file:save", async (_event, payload: { filePath?: string; content
 });
 
 ipcMain.handle("file:recent", () => getRecentFiles());
+ipcMain.handle("file:remove-recent", (_event, filePath: string) => {
+  forgetFile(filePath);
+  return getRecentFiles();
+});
 ipcMain.handle("file:image-data-url", async (_event, filePath: string) => {
   const normalized = path.resolve(filePath);
   const mime = imageMimeTypes[path.extname(normalized).toLowerCase()];

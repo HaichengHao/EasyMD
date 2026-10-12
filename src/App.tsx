@@ -110,6 +110,7 @@ const zh = {
   currentDocument: "\u5f53\u524d\u6587\u6863",
   blankDocument: "\u7a7a\u767d\u6587\u6863",
   recentFile: "\u6700\u8fd1\u6587\u4ef6",
+  removeRecentFile: "\u4ece\u6700\u8fd1\u6587\u4ef6\u79fb\u9664",
   noHeading: "\u6682\u65e0\u6807\u9898",
   open: "\u6253\u5f00",
   save: "\u4fdd\u5b58",
@@ -241,6 +242,7 @@ const en: typeof zh = {
   currentDocument: "Current Document",
   blankDocument: "Blank Document",
   recentFile: "Recent File",
+  removeRecentFile: "Remove from Recent Files",
   noHeading: "No headings",
   open: "Open",
   save: "Save",
@@ -776,24 +778,61 @@ export function App() {
     setToasts((items) => items.filter((item) => item.id !== id));
   }
 
-  async function openFile() {
-    const result = await window.easyMD.openFile();
-    if (!result) return;
+  function applyOpenedFile(result: EasyMDFileResult, showToast = true) {
     setMarkdown(result.content || "");
     setFilePath(result.filePath);
     setRecentFiles(result.recentFiles);
     setDirty(false);
-    notify(t.fileOpened, compactPath(result.filePath), "success");
+    if (showToast) notify(t.fileOpened, compactPath(result.filePath), "success");
+  }
+
+  function requestApplyOpenedFile(result: EasyMDFileResult) {
+    if (!dirty || result.filePath === filePath) {
+      applyOpenedFile(result);
+      return;
+    }
+    setConfirmState({
+      title: t.unsavedTitle,
+      detail: t.unsavedDetail,
+      primary: t.save,
+      secondary: t.dontSave,
+      cancel: t.cancel,
+      onPrimary: () => void saveFile(false, false, true).then((saved) => {
+        if (saved) applyOpenedFile(result);
+      }),
+      onSecondary: () => applyOpenedFile(result)
+    });
+  }
+
+  async function openFile() {
+    const result = await window.easyMD.openFile();
+    if (!result) return;
+    requestApplyOpenedFile(result);
+  }
+
+  async function openRecentFile(targetPath: string) {
+    try {
+      const result = await window.easyMD.openPath(targetPath);
+      requestApplyOpenedFile(result);
+    } catch (error) {
+      notifyError(t.fileOpened, error);
+    }
+  }
+
+  async function removeRecentFile(targetPath: string) {
+    const next = await window.easyMD.removeRecentFile(targetPath);
+    setRecentFiles(next);
   }
 
   async function saveFile(forceSaveAs = false, closeAfterSave = false, quiet = false) {
     const result = await window.easyMD.saveFile({ filePath: forceSaveAs ? undefined : filePath, content: markdown });
-    if (!result) return;
+    if (!result) return false;
     setFilePath(result.filePath);
     setRecentFiles(result.recentFiles);
     setDirty(false);
     if (!quiet) notify(t.fileSaved, compactPath(result.filePath), "success");
     if (closeAfterSave) window.easyMD.closeAfterSave();
+    return true;
   }
 
   async function exportPdf() {
@@ -861,6 +900,21 @@ export function App() {
   function runRedo() {
     const editor = editorViewRef.current;
     if (editor) redo(editor);
+  }
+
+  function jumpToOutlineItem(item: { id: string; line: number }) {
+    const editor = editorViewRef.current;
+    if (editor && (viewMode === "source" || viewMode === "split")) {
+      const line = editor.state.doc.line(Math.min(item.line, editor.state.doc.lines));
+      editor.dispatch({
+        selection: { anchor: line.from },
+        effects: EditorView.scrollIntoView(line.from, { y: "start", yMargin: 32 })
+      });
+      editor.focus();
+    }
+    if (viewMode === "preview" || viewMode === "split") {
+      document.getElementById(item.id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
   }
 
   function revealMatch(index: number) {
@@ -1536,6 +1590,9 @@ export function App() {
     const off = [
       window.easyMD.onMenu("menu:new", newFile),
       window.easyMD.onMenu("menu:open", openFile),
+      window.easyMD.onMenu("menu:open-recent", (targetPath) => {
+        if (typeof targetPath === "string") void openRecentFile(targetPath);
+      }),
       window.easyMD.onMenu("menu:save", () => void saveFile(false)),
       window.easyMD.onMenu("menu:save-then-close", () => void saveFile(false, true)),
       window.easyMD.onMenu("menu:save-as", () => void saveFile(true)),
@@ -1555,6 +1612,12 @@ export function App() {
         notify(t.aboutTitle, `${t.currentVersion}: ${appInfo.version}`, "info");
       }),
       window.easyMD.onMenu("app:request-close", requestCloseDocument)
+      ,
+      window.easyMD.onMenu("app:open-file", (result) => {
+        if (result && typeof result === "object" && "filePath" in result) {
+          requestApplyOpenedFile(result as EasyMDFileResult);
+        }
+      })
     ];
     return () => off.forEach((dispose) => dispose());
   });
@@ -1613,11 +1676,20 @@ export function App() {
                     <span>{markdown.split("\n")[0]?.replace(/^#\s*/, "") || t.blankDocument}</span>
                   </button>
                   {recentFiles.map((item) => (
-                    <button className="file-card" key={item}>
-                      <small>{t.recentFile}</small>
-                      <strong>{fileName(item)}</strong>
-                      <span>{item}</span>
-                    </button>
+                    <div className={item === filePath ? "file-card-row active" : "file-card-row"} key={item}>
+                      <button className="file-card" onClick={() => void openRecentFile(item)}>
+                        <small>{t.recentFile}</small>
+                        <strong>{fileName(item)}</strong>
+                        <span>{item}</span>
+                      </button>
+                      <button
+                        className="file-remove"
+                        title={t.removeRecentFile}
+                        onClick={() => void removeRecentFile(item)}
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
                   ))}
                 </div>
               ) : (
@@ -1626,7 +1698,7 @@ export function App() {
                     <button
                       key={item.id}
                       style={{ paddingLeft: `${12 + (item.level - 1) * 14}px` }}
-                      onClick={() => document.getElementById(item.id)?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                      onClick={() => jumpToOutlineItem(item)}
                     >
                       {item.text}
                     </button>

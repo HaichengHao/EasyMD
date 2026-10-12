@@ -126,6 +126,20 @@ function resolveImagePath(src: string, basePath?: string) {
   return normalizeLocalPath(`${baseDir}/${normalizedSrc}`);
 }
 
+function htmlAttribute(value: string, name: string) {
+  const match = value.match(new RegExp(`${name}\\s*=\\s*("([^"]*)"|'([^']*)'|([^\\s>]+))`, "i"));
+  return match?.[2] || match?.[3] || match?.[4] || "";
+}
+
+function markdownImageFromHtmlTag(tag: string) {
+  const src = htmlAttribute(tag, "src").trim();
+  if (!src) return tag;
+  const alt = htmlAttribute(tag, "alt").replace(/[\[\]\n\r]/g, " ").trim();
+  const normalizedSrc = src.replace(/\\/g, "/");
+  const wrappedSrc = /[\s()]/.test(normalizedSrc) && !/^<.*>$/.test(normalizedSrc) ? `<${normalizedSrc}>` : normalizedSrc;
+  return `![${alt}](${wrappedSrc})`;
+}
+
 function normalizeLooseImageSyntax(source: string) {
   let inFence = false;
   return source
@@ -134,13 +148,15 @@ function normalizeLooseImageSyntax(source: string) {
     .map((line) => {
       if (/^\s*(```|~~~)/.test(line)) inFence = !inFence;
       if (inFence) return line;
-      return line.replace(/!\[([^\]]*)\]\(([^)\n]+)\)/g, (match, alt: string, rawSrc: string) => {
-        const src = rawSrc.trim();
-        if (!src || src.startsWith("<") || /^\w+:\/\//.test(src) || /^data:/i.test(src)) return match;
-        const normalizedSrc = src.replace(/\\/g, "/");
-        if (!/[\s\\]/.test(src)) return match;
-        return `![${alt}](<${normalizedSrc}>)`;
-      });
+      return line
+        .replace(/<img\b[^>]*\/?>/gi, (match) => markdownImageFromHtmlTag(match))
+        .replace(/!\[([^\]]*)\]\(([^)\n]+)\)/g, (match, alt: string, rawSrc: string) => {
+          const src = rawSrc.trim();
+          if (!src || src.startsWith("<") || /^\w+:\/\//.test(src) || /^data:/i.test(src)) return match;
+          const normalizedSrc = src.replace(/\\/g, "/");
+          if (!/[\s\\]/.test(src)) return match;
+          return `![${alt}](<${normalizedSrc}>)`;
+        });
     })
     .join("\n");
 }
